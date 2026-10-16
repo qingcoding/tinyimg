@@ -1,8 +1,8 @@
 //! PNG 压缩管线 —— TinyPNG 核心路线的复刻
 //!
-//! 解码（归一化为 8-bit RGBA）→ 半透明检测：
-//! - 含半透明：保守回退为 RGBA 真彩 + zopfli（不量化，避免质量事故）
-//! - 否则：NeuQuant 量化为 ≤ N 色索引 PNG + zopfli
+//! 解码（归一化为 8-bit RGBA）→ 量化分流（由 quant::quantize_rgba 决策）：
+//! - 半透明 ≤5%：量化为 ≤ N 色索引 PNG（半透明专用调色板槽，pngquant 同族思路）
+//! - 半透明 >5%：回退信号 → RGBA 真彩 + zopfli（保守，不量化）
 //!
 //! 重新写出意味着只保留最小必要 chunk，EXIF/ICC/文本等元数据天然被剥离。
 
@@ -63,10 +63,18 @@ pub fn compress_png(data: &[u8], opts: &Options) -> Result<Compressed> {
         });
     }
 
-    // 半透明检测：0 < alpha < 255 的像素存在时不做量化（保守策略）
-    let has_semi_transparent = rgba.chunks_exact(4).any(|p| p[3] != 0 && p[3] != 255);
+    // 量化分流（quant 内部决策）：
+    // - 半透明 ≤5%：索引 PNG（半透明专用槽位）
+    // - 半透明 >5% 或槽位不足：回退信号 → RGBA 真彩 + zopfli（保守，不量化）
+    let q = quant::quantize_rgba(
+        &rgba,
+        width as usize,
+        height as usize,
+        opts.colors,
+        opts.dither,
+    );
 
-    if has_semi_transparent {
+    if q.fallback_truecolor {
         let out = pngw::write_rgba_png(width, height, &rgba);
         return Ok(Compressed {
             bytes: out,
@@ -75,22 +83,20 @@ pub fn compress_png(data: &[u8], opts: &Options) -> Result<Compressed> {
         });
     }
 
-    let q = quant::quantize_rgba(
-        &rgba,
-        width as usize,
-        height as usize,
-        opts.colors,
-        opts.dither,
-    );
     let out = pngw::write_indexed_png(width, height, &q.palette, &q.indices, q.transparent);
+
+    let mut detail = format!(
+        "{} 色索引 + zopfli{}",
+        q.palette.len(),
+        if opts.dither { " + 误差扩散" } else { "" }
+    );
+    if q.semi_approximated > 0 {
+        detail.push_str(&format!("（半透明近似 {} px）", q.semi_approximated));
+    }
 
     Ok(Compressed {
         bytes: out,
-        detail: format!(
-            "{} 色索引 + zopfli{}",
-            q.palette.len(),
-            if opts.dither { " + 误差扩散" } else { "" }
-        ),
+        detail,
         info: image_info,
     })
 }

@@ -110,11 +110,22 @@ pub fn write_indexed_png(
     }
     append_chunk(&mut out, b"PLTE", &plte);
 
-    if let Some(t) = transparent {
-        // tRNS 只需列出到最后一个非全不透明项为止的 alpha 序列
-        let mut trns = vec![255u8; t];
-        trns.push(0);
-        append_chunk(&mut out, b"tRNS", &trns);
+    // tRNS：半透明量化后调色板可能含中间的半透明项（alpha<255），
+    // 按 PNG 规范列出 0..=最后一个非全不透明项的 alpha 序列（缺省项为 255）；
+    // 旧的"基础色板 + 末尾全透明槽"结构下输出与原先逐字节一致
+    if !palette.is_empty() {
+        let last_alpha = palette.iter().rposition(|c| c[3] != 255);
+        let tns_end = match (transparent, last_alpha) {
+            (Some(t), Some(last)) => Some(t.max(last)),
+            (Some(t), None) => Some(t),
+            (None, Some(last)) => Some(last),
+            (None, None) => None,
+        };
+        if let Some(end) = tns_end {
+            let end = end.min(palette.len() - 1);
+            let trns: Vec<u8> = palette[..=end].iter().map(|c| c[3]).collect();
+            append_chunk(&mut out, b"tRNS", &trns);
+        }
     }
 
     append_chunk(&mut out, b"IDAT", &idat);
@@ -163,5 +174,25 @@ mod tests {
         assert!(png.windows(4).any(|w| w == b"PLTE"));
         assert!(png.windows(4).any(|w| w == b"IDAT"));
         assert!(png.windows(4).any(|w| w == b"IEND"));
+    }
+
+    #[test]
+    fn indexed_png_trns_carries_semi_alpha() {
+        // 半透明量化后的调色板：基础色 + 中间半透明项 + 末尾全透明项，
+        // tRNS 应按序列出每个色板的 alpha（255 / 128 / 0）
+        let palette = [
+            [230u8, 126, 34, 255],
+            [210, 120, 60, 128],
+            [0, 0, 0, 0],
+        ];
+        let indices = [0u8, 1, 2, 0, 1, 2];
+        let png = write_indexed_png(3, 2, &palette, &indices, Some(2));
+        let trns_pos = png
+            .windows(4)
+            .position(|w| w == b"tRNS")
+            .expect("应写出 tRNS chunk");
+        let len = u32::from_be_bytes(png[trns_pos - 4..trns_pos].try_into().unwrap()) as usize;
+        let trns = &png[trns_pos + 4..trns_pos + 4 + len];
+        assert_eq!(trns, &[255, 128, 0]);
     }
 }

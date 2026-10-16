@@ -65,6 +65,7 @@ cargo build --release
 | photo.jpg 同上 | WebP | 451 KB | 40.5 KB | **-91.0%** | 41.3 dB ✅ |
 | logo.png（400×400 扁平色+透明） | auto | 1.8 KB | 787 B | -56.8% | 7 色索引 |
 | logo.png 同上 | WebP | 1.8 KB | 122 B | **-93.3%** | 无损，完全一致 ✅ |
+| juzi.png（500×443 抠图，59% 全透明 + 1.6% 半透明） | auto | 315 KB | 89.4 KB | **-71.6%** | 35.5 dB ✅ |
 | tiny.png（32×32 已优化） | auto | 83 B | — | 跳过 | 无收益时保留原文件 |
 
 > 复现：`cargo run --example gen_samples` 生成样本 → 压缩 → `cargo run --example verify_quality -- <原图> <压缩图>` 校验画质（支持 PNG/JPEG/WebP）。
@@ -80,14 +81,18 @@ TinyPNG 的核心不是"再压一次 Deflate"，而是**改变数据的表示方
 | ③ 误差扩散 | 精细控制的 dithering | 可选 Floyd–Steinberg（`--dither`） |
 | ④ 无损增强 | zopfli（DEFLATE 穷举优化，比 zlib 小 3-8%） | `zopfli` crate，IDAT 极限压缩 |
 | ⑤ 元数据剥离 | 去除 EXIF / ICC / 文本块 | 重新写出，只保留最小必要 chunk |
-| ⑥ 智能回退 | 质量下降明显时自动调整 | 体积守卫：无收益则保留原文件；半透明不量化走真彩 |
+| ⑥ 智能回退 | 质量下降明显时自动调整 | 体积守卫：无收益则保留原文件；半透明 >5% 回退真彩 |
 
 **PNG 路线**：解码归一化为 8-bit RGBA → 量化 ≤256 色索引 PNG → zopfli 压缩 IDAT。
 **JPEG 路线**：解码 → 按目标质量重编码（量化表重生成）→ 只写 JFIF 标准段（元数据天然剥离）。
 **WebP 路线**（`--format webp`）：解码后直接 libwebp 编码——照片走有损（VP8 预测编码，
 同画质比 JPEG 小 25-35%），扁平少色图（≤256 色，如 logo/图标/像素画）自动走无损，守住硬边。
 
-半透明图片（0 < alpha < 255）**不量化**，保守回退为 RGBA 真彩 + zopfli——避免透明通道被量化的质量事故。
+半透明像素（0 < alpha < 255）按占比分流：**≤5%** 时走量化扩展——不透明像素照常学基础色板，
+半透明像素按 `(r>>3, g>>3, b>>3, alpha)` 粗桶直方图取 Top-N 生成半透明专用调色板槽
+（pngquant 同族思路，抗锯齿边缘同色系聚为一桶，桶内平均 RGB/alpha），半透明像素与
+不透明像素共同参与 Floyd–Steinberg 误差扩散；**>5%** 时量化 alpha 是质量事故高发区，
+保守回退为 RGBA 真彩 + zopfli。
 
 ## 参数说明
 
@@ -131,17 +136,18 @@ tinyimg-pc/
 ├── examples/
 │   ├── gen_samples.rs    # 生成测试样本
 │   └── verify_quality.rs # 像素级画质校验（MAE / PSNR，支持 PNG/JPEG/WebP）
-└── tests/integration.rs  # 端到端测试（28 项）
+└── tests/integration.rs  # 端到端测试（21 项）
 ```
 
 ## 测试
 
 ```bash
-cargo test                       # 10 项单元测试 + 18 项集成测试
+cargo test                       # 19 项单元测试 + 21 项集成测试（共 40 项）
 cargo build --release --no-default-features   # 精简构建（无 WebP，~1.0 MB）
 ```
 
-覆盖：CRC32 标准向量、量化色数预算、透明槽位、半透明回退、JPEG 管线、
+覆盖：CRC32 标准向量、量化色数预算、透明槽位、半透明量化扩展（≤5% 索引 + tRNS
+半透明 alpha）/ 真彩回退（>5%）/ 近似数报告、JPEG 管线、
 WebP 有损/无损分流、输出命名策略（含 .webp 扩展名）、无收益跳过、
 损坏文件容错、目录扫描。
 
@@ -160,7 +166,7 @@ WebP 有损/无损分流、输出命名策略（含 .webp 扩展名）、无收�
 | Rust + 手工 PNG 写出而非 image crate | 二进制 1.0 MB；image crate 全特性会引入数 MB |
 | zopfli 而非 miniz_oxide | TinyPNG 同款压缩器，索引数据上再省 3-8% |
 | NeuQuant 而非 Median Cut | 神经网络量化对照片类渐变更稳，纯 Rust 无 C 依赖 |
-| 半透明不量化 | 保守策略，量化 alpha 是质量事故高发区 |
+| 半透明 ≤5% 量化扩展 / >5% 真彩回退 | 抠图抗锯齿边缘色系统计聚桶后可无损承受；大面积半透明量化 alpha 是质量事故高发区 |
 | 体积守卫（无收益跳过） | 已优化图片二次压缩可能反而变大 |
 | CLI 先行 | 最小可用形态验证算法效果；GUI 阶段复用压缩核心库 |
 | WebP 走 libwebp 绑定（feature 门控） | 有损+无损+质量控制只有 libwebp 提供；纯 Rust 方案仅无损；`--no-default-features` 可回到 1.0 MB |

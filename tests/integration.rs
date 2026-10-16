@@ -46,6 +46,39 @@ fn gradient_rgba(w: usize, h: usize) -> Vec<u8> {
     rgba
 }
 
+/// 半透明抠图测试图（200x200）：50% 全透明 + 45% 不透明纯色块 + 5% 半透明块。
+/// 半透明占比恰为 5% 阈值边界（semi*20 == total），应走量化扩展而非真彩回退。
+/// 注：任务描述中"10% 半透明"会触发 >5% 回退，与算法规规矛盾，按算法取 5% 边界值。
+fn semi_cutout_rgba(w: usize, h: usize) -> Vec<u8> {
+    let blocks = [
+        [230u8, 126, 34, 255],
+        [231, 76, 60, 255],
+        [46, 204, 113, 255],
+        [52, 152, 219, 255],
+        [241, 196, 15, 255],
+        [155, 89, 182, 255],
+        [236, 240, 241, 255],
+        [44, 62, 80, 255],
+    ];
+    let mut rgba = Vec::with_capacity(w * h * 4);
+    for y in 0..h {
+        for x in 0..w {
+            if y < h / 2 {
+                // 上半幅全透明（50%）
+                rgba.extend_from_slice(&[0, 0, 0, 0]);
+            } else if y < h * 19 / 20 {
+                // 中段纯色块（45%）
+                let idx = ((x / 10) + (y / 10)) % blocks.len();
+                rgba.extend_from_slice(&blocks[idx]);
+            } else {
+                // 底部半透明块（5%）
+                rgba.extend_from_slice(&[210, 120, 60, 128]);
+            }
+        }
+    }
+    rgba
+}
+
 #[test]
 fn crc32_known_vector() {
     assert_eq!(crc32(b"123456789"), 0xCBF4_3926);
@@ -115,6 +148,102 @@ fn semi_transparent_png_falls_back_to_truecolor() {
     let decoder = png::Decoder::new(std::io::Cursor::new(&compressed.bytes));
     let reader = decoder.read_info().expect("应可解码");
     assert_eq!(reader.info().color_type, png::ColorType::Rgba);
+}
+
+// ---------- 半透明量化扩展（≤5% 走索引，>5% 真彩回退） ----------
+
+#[test]
+fn semi_transparent_cutout_quantizes() {
+    // 50% 全透明 + 45% 不透明纯色块 + 5% 半透明 → 索引色输出（非真彩回退）
+    let rgba = semi_cutout_rgba(200, 200);
+    let original = write_rgba_png(200, 200, &rgba);
+    let compressed = compress_bytes(&original, &default_options()).expect("压缩失败");
+
+    assert!(
+        !compressed.detail.contains("真彩"),
+        "≤5% 半透明不应回退真彩，detail: {}",
+        compressed.detail
+    );
+    assert!(compressed.detail.contains("色索引"), "detail: {}", compressed.detail);
+    assert!(
+        compressed.bytes.len() < original.len(),
+        "索引输出应小于 RGBA 原图: {} -> {}",
+        original.len(),
+        compressed.bytes.len()
+    );
+
+    let mut decoder = png::Decoder::new(std::io::Cursor::new(&compressed.bytes));
+    decoder.set_transformations(png::Transformations::EXPAND);
+    let mut reader = decoder.read_info().expect("应可解码");
+    assert_eq!(reader.info().color_type, png::ColorType::Indexed, "应为索引色输出");
+    assert!(reader.info().trns.is_some(), "应写出 tRNS chunk");
+    let mut buf = vec![0u8; reader.output_buffer_size()];
+    let info = reader.next_frame(&mut buf).expect("读取帧失败");
+    let pixels = &buf[..info.buffer_size()];
+
+    // 顶部全透明区（50%）alpha 应为 0
+    for i in 0..200 * 100 {
+        assert_eq!(pixels[i * 4 + 3], 0, "像素 {} 应全透明", i);
+    }
+    // 底部半透明区（5%）alpha 解码后应接近 128（±16）
+    for y in 190..200 {
+        for x in 0..200 {
+            let a = pixels[(y * 200 + x) * 4 + 3] as i32;
+            assert!(
+                (a - 128).abs() <= 16,
+                "({},{}) alpha={} 应接近 128",
+                x,
+                y,
+                a
+            );
+        }
+    }
+    // 中部不透明区 alpha 应为 255
+    for i in 200 * 100..200 * 190 {
+        assert_eq!(pixels[i * 4 + 3], 255, "像素 {} 应不透明", i);
+    }
+}
+
+#[test]
+fn heavy_semi_transparent_falls_back() {
+    // 60% 半透明 → 超过 5% 阈值 → RGBA 真彩回退（保守策略保持）
+    let mut rgba = gradient_rgba(100, 100);
+    for p in rgba.chunks_exact_mut(4).take(6_000) {
+        p[3] = 128;
+    }
+    let original = write_rgba_png(100, 100, &rgba);
+    let compressed = compress_bytes(&original, &default_options()).expect("压缩失败");
+    assert!(compressed.detail.contains("真彩"), "detail: {}", compressed.detail);
+
+    let decoder = png::Decoder::new(std::io::Cursor::new(&compressed.bytes));
+    let reader = decoder.read_info().expect("应可解码");
+    assert_eq!(reader.info().color_type, png::ColorType::Rgba);
+}
+
+#[test]
+fn semi_approx_count_reported() {
+    // 3% 半透明像素且颜色随机分散（粗桶几乎无法精确命中）→ detail 报告近似数
+    let mut rgba = gradient_rgba(100, 100);
+    let mut seed = 0x0BAD_F00Du32;
+    for i in 0..300 {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        let px = &mut rgba[i * 4..i * 4 + 4];
+        px[0] = (seed & 0xFF) as u8;
+        px[1] = ((seed >> 8) & 0xFF) as u8;
+        px[2] = ((seed >> 16) & 0xFF) as u8;
+        px[3] = 100 + (seed % 100) as u8;
+    }
+    let original = write_rgba_png(100, 100, &rgba);
+    let compressed = compress_bytes(&original, &default_options()).expect("压缩失败");
+    assert!(
+        compressed.detail.contains("半透明近似"),
+        "detail: {}",
+        compressed.detail
+    );
+    // 仍走索引路线（未回退真彩）
+    assert!(compressed.detail.contains("色索引"), "detail: {}", compressed.detail);
 }
 
 #[test]
