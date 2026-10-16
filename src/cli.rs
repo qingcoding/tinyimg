@@ -4,15 +4,15 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
-use crate::compress::Options;
+use crate::compress::{Options, OutputFormat};
 
 /// 图小小 TinyImg — 本地图片压缩工具（TinyPNG 核心算法的 Rust 实现）
 #[derive(Parser, Debug)]
 #[command(
     name = "tinyimg",
     version,
-    about = "图小小 TinyImg — 本地批量图片压缩工具（PNG 量化 + JPEG 重编码）",
-    after_help = "示例:\n  tinyimg photo.png                  # 压缩单张，输出 photo-min.png\n  tinyimg ./assets -o ./out          # 压缩目录（递归），输出到 out/\n  tinyimg *.png --preset low         # 低档位，体积优先\n  tinyimg a.png --colors 64 --dither # 自定义 64 色 + 误差扩散"
+    about = "图小小 TinyImg — 本地批量图片压缩工具（PNG 量化 + JPEG 重编码 + WebP 输出）",
+    after_help = "示例:\n  tinyimg photo.png                  # 压缩单张，输出 photo-min.png\n  tinyimg ./assets -o ./out          # 压缩目录（递归），输出到 out/\n  tinyimg *.png --preset low         # 低档位，体积优先\n  tinyimg a.png --colors 64 --dither # 自定义 64 色 + 误差扩散\n  tinyimg ./assets --format webp     # 一律输出 WebP（有损）"
 )]
 pub struct Args {
     /// 图片文件或目录（目录默认递归扫描，仅识别 PNG/JPEG）
@@ -27,11 +27,15 @@ pub struct Args {
     #[arg(short, long, default_value = "high", value_name = "PRESET")]
     pub preset: String,
 
+    /// 输出格式：auto（跟随输入，默认）/ webp（一律转 WebP 有损）
+    #[arg(short, long, default_value = "auto", value_name = "FMT")]
+    pub format: String,
+
     /// 自定义 PNG 量化色数（2-256），设置后覆盖档位色数
     #[arg(long, value_name = "N")]
     pub colors: Option<usize>,
 
-    /// 自定义 JPEG 质量（1-100），设置后覆盖档位质量
+    /// 自定义有损质量（1-100），作用于 JPEG 重编码 / WebP 编码
     #[arg(long, value_name = "Q")]
     pub jpeg_quality: Option<u8>,
 
@@ -55,15 +59,20 @@ pub struct Args {
 impl Args {
     /// 将 CLI 参数解析为压缩选项
     pub fn to_options(&self) -> anyhow::Result<Options> {
-        let (mut colors, mut jpeg_quality) = match self.preset.to_lowercase().as_str() {
+        let (mut colors, mut quality) = match self.preset.to_lowercase().as_str() {
             "high" | "h" | "高" => (256, 88),
             "medium" | "m" | "中" => (128, 82),
             "low" | "l" | "低" => (64, 72),
             other => {
-                anyhow::bail!(
-                    "未知质量档位: {}（可选: high / medium / low）",
-                    other
-                )
+                anyhow::bail!("未知质量档位: {}（可选: high / medium / low）", other)
+            }
+        };
+
+        let output_format = match self.format.to_lowercase().as_str() {
+            "auto" | "a" | "自动" => OutputFormat::Auto,
+            "webp" | "w" => OutputFormat::WebP,
+            other => {
+                anyhow::bail!("未知输出格式: {}（可选: auto / webp）", other)
             }
         };
 
@@ -77,13 +86,14 @@ impl Args {
             if !(1..=100).contains(&q) {
                 anyhow::bail!("--jpeg-quality 必须在 1-100 之间");
             }
-            jpeg_quality = q;
+            quality = q;
         }
 
         Ok(Options {
             colors,
-            jpeg_quality,
+            quality,
             dither: self.dither,
+            output_format,
         })
     }
 }

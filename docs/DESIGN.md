@@ -99,9 +99,10 @@ JPEG 本身已是有损格式，不能再"量化到 256 色"。TinyPNG 的做法
 |---|---|---|
 | `quant.rs` | NeuQuant 神经网络量化、调色板去重、Floyd–Steinberg 误差扩散、透明槽位 | ① 量化 + 误差控制 |
 | `pngw.rs` | 手工 PNG 组包（CRC32）、zopfli IDAT 压缩、tRNS 写出 | ③ zopfli + ③ 元数据剥离 |
-| `compress/png.rs` | 解码归一化、半透明检测与真彩回退 | ⑤ 智能回退（半透明策略） |
-| `compress/jpeg.rs` | 重编码 + 色彩空间适配 | ④ JPEG 处理 |
-| `compress/mod.rs` | 格式识别、输出策略、体积守卫 | ⑤ 智能回退（体积策略） |
+| `compress/png.rs` | 解码归一化、半透明检测与真彩回退、WebP 输出分流 | ⑤ 智能回退（半透明策略） |
+| `compress/jpeg.rs` | 重编码 + 色彩空间适配 + WebP 输出分流 | ④ JPEG 处理 |
+| `compress/webp.rs` | libwebp 有损/无损编码（feature 门控） | WebP 输出 |
+| `compress/mod.rs` | 格式识别、输出策略、扁平图检测、体积守卫 | ⑤ 智能回退（体积策略） |
 
 ### 2.3 与 TinyPNG 的差异（如实说明）
 
@@ -109,9 +110,24 @@ JPEG 本身已是有损格式，不能再"量化到 256 色"。TinyPNG 的做法
 |---|---|---|---|
 | 量化算法 | 自研（未开源） | NeuQuant（公开算法） | 极端图片上色板效率略逊 |
 | JPEG 编码器 | mozjpeg（C） | jpeg-encoder（纯 Rust） | 同质量下体积大约 2-5% |
-| 画质回退 | SSIM 评估后自动调整 | 体积守卫 + 半透明不量化 | 无 SSIM 自动重试（M2 排期） |
-| WebP/AVIF | 支持 | 暂不支持（M4 排期） | 覆盖格式较少 |
+| 画质回退 | SSIM 评估后自动调整 | 体积守卫 + 半透明不量化 + 扁平图 WebP 无损 | 无 SSIM 自动重试（M2 排期） |
+| WebP 输入 | 支持 | 暂不支持（M4 排期） | 仅输出不支持输入 |
 | 交付形态 | 网页 + API | 本地 CLI（GUI 排期） | 无上传体积/次数限制，隐私更好 |
+
+### 2.3b WebP 输出的设计决策
+
+`--format webp` 是本工具对 TinyPNG 能力集的扩展（TinyPNG 输出 WebP 需订阅）。
+关键决策与实测依据：
+
+1. **跳过量化**：WebP 的 VP8 有内部帧内预测编码，先量化到 256 色反而损失色阶，
+   直接喂 RGBA 让 libwebp 自己决策。
+2. **扁平图自动无损**：实测 logo.png 走有损 q88 时 PSNR 仅 19.7 dB（硬边被糊），
+   而 ≤256 色的图走无损编码后体积仅 122 B（比原图还小 93.3%）且**零损失**。
+   判定方法：抽样统计唯一颜色数（RGBA 打包 key），≤256 判为扁平图。
+3. **有损质量语义复用**：WebP quality 与 JPEG quality 同语义（1-100），
+   档位映射 high=88 / medium=82 / low=72 直接沿用。
+4. **feature 门控**：libwebp 是 C 依赖，通过 cargo feature `webp`（默认开）门控，
+   `--no-default-features` 构建回到 1.0 MB 的纯 Rust 二进制。
 
 ### 2.4 依赖选型（包体优先）
 
@@ -122,6 +138,7 @@ JPEG 本身已是有损格式，不能再"量化到 256 色"。TinyPNG 的做法
 | `jpeg-encoder` | JPEG 编码 | 纯 Rust；不写 EXIF，元数据天然剥离 |
 | `color_quant` | NeuQuant | 纯 Rust，无 C 绑定 |
 | `zopfli` | DEFLATE 极限压缩 | TinyPNG 同款压缩器 |
+| `webp` | WebP 编码 | libwebp 绑定；有损+无损+质量控制，feature 门控不影响默认包体策略 |
 | `clap` `rayon` `indicatif` `walkdir` | CLI/并行/进度/遍历 | 成熟小依赖 |
 
 **不选 `image` crate 全特性**：解码器全家桶会让二进制膨胀数 MB，违背"包可以小"的
@@ -130,23 +147,30 @@ JPEG 本身已是有损格式，不能再"量化到 256 色"。TinyPNG 的做法
 ### 2.5 包体优化手段
 
 `Cargo.toml` release profile：`lto = true` + `codegen-units = 1` + `strip = true`
-+ `panic = "abort"`。实测二进制 **1.0 MB**（对比 Electron 方案 100 MB+）。
++ `panic = "abort"`。实测二进制：**1.0 MB**（无 WebP）/ **1.3 MB**（含 WebP），
+对比 Electron 方案 100 MB+。
 
 ## 3. 质量数据（实测，可复现）
 
-| 样本 | 档位 | 体积变化 | PSNR | 判定 |
+| 样本 | 模式 | 体积变化 | PSNR | 判定 |
 |---|---|---|---|---|
-| photo.png 1600×1000（含噪声照片） | high | -93.2% | 32.9 dB | 轻微可见 |
-| photo.png 同上 | high + dither | -90.4% | 31.5 dB | 色带更平滑 |
-| smooth.png 1200×800（平滑渐变） | high | -95.1% | 36.2 dB | ✅ 视觉无损 |
-| photo.jpg 1600×1000 q95 | high | -67.5% | — | 重编码 q88 |
+| photo.png 1600×1000（含噪声照片） | auto | -93.2% | 32.9 dB | 轻微可见 |
+| photo.png 同上 | WebP | -93.2% | 39.3 dB | ✅ 视觉无损 |
+| smooth.png 1200×800（平滑渐变） | auto | -95.1% | 36.2 dB | ✅ 视觉无损 |
+| smooth.png 同上 | WebP | -96.8% | 47.1 dB | ✅ 视觉无损 |
+| photo.jpg 1600×1000 q95 | auto | -67.5% | — | 重编码 q88 |
+| photo.jpg 同上 | WebP | -91.0% | 41.3 dB | ✅ 视觉无损 |
+| logo.png 400×400 扁平+透明 | auto | -56.8% | — | 7 色索引 |
+| logo.png 同上 | WebP | -93.3% | ∞（完全一致） | ✅ 无损 |
 
 > 判据：PSNR ≥ 35 dB 为业界常用"视觉无损"阈值。含均匀噪声的合成图是量化的
 > 最坏情况（噪声把色数推离 256 上限），真实照片通常介于两样本之间。
+> **WebP 输出在全部样本上达到或超过 auto 模式**，照片类提升尤其显著。
 
 ## 4. 演进路线
 
 - **M1（已交付）**：CLI 核心 —— PNG 量化 / JPEG 重编码 / zopfli / 元数据剥离 / 并行
+- **M1.5（已交付）**：WebP 输出（`--format webp`，扁平图自动无损）+ 富信息报告
 - **M2**：SSIM 画质守卫 —— 量化后 SSIM < 0.98 时自动提高色数重试（PRD 智能回退完全体）
 - **M3**：Tauri 2.x GUI —— 复用 `src/compress` 库，加拖拽导入、前后对比滑块
 - **M4**：WebP / AVIF 输入

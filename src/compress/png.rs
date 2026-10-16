@@ -10,7 +10,9 @@ use anyhow::{anyhow, Context, Result};
 
 use png::{ColorType as PngColorType, Decoder, Transformations};
 
-use super::{Compressed, Options};
+use super::{
+    webp, Compressed, ImageInfo, Options, OutFormat, OutputFormat,
+};
 use crate::pngw;
 use crate::quant;
 
@@ -28,32 +30,59 @@ pub fn compress_png(data: &[u8], opts: &Options) -> Result<Compressed> {
         .map_err(|e| anyhow!("PNG 解码失败: {e}"))?;
 
     let bytes = &buf[..info.buffer_size()];
-    let (width, height) = (info.width as usize, info.height as usize);
+    let (width, height) = (info.width, info.height);
     if width == 0 || height == 0 {
         return Err(anyhow!("图片尺寸为 0"));
     }
 
     let rgba = to_rgba(bytes, info.color_type).context("像素格式转换失败")?;
+    let image_info = ImageInfo {
+        width,
+        height,
+        in_format: super::Format::Png,
+        out_format: OutFormat::Png,
+    };
+
+    // WebP 输出：跳过量化（VP8 有内部预测编码，先量化反而损失色阶）。
+    // 扁平少色图（logo/图标/像素画）走无损编码守住硬边，照片走有损。
+    if opts.output_format == OutputFormat::WebP {
+        let lossless = super::is_flat_art(&rgba);
+        let out = webp::encode_webp(&rgba, width, height, opts.quality, lossless)?;
+        let detail = if lossless {
+            "WebP 无损编码（扁平少色图）+ 剥离元数据".to_string()
+        } else {
+            format!("WebP 有损编码 q{} + 剥离元数据", opts.quality)
+        };
+        return Ok(Compressed {
+            bytes: out,
+            detail,
+            info: ImageInfo {
+                out_format: OutFormat::WebP,
+                ..image_info
+            },
+        });
+    }
 
     // 半透明检测：0 < alpha < 255 的像素存在时不做量化（保守策略）
     let has_semi_transparent = rgba.chunks_exact(4).any(|p| p[3] != 0 && p[3] != 255);
 
     if has_semi_transparent {
-        let out = pngw::write_rgba_png(width as u32, height as u32, &rgba);
+        let out = pngw::write_rgba_png(width, height, &rgba);
         return Ok(Compressed {
             bytes: out,
             detail: "RGBA 真彩 + zopfli（含半透明，未量化）".to_string(),
+            info: image_info,
         });
     }
 
-    let q = quant::quantize_rgba(&rgba, width, height, opts.colors, opts.dither);
-    let out = pngw::write_indexed_png(
-        width as u32,
-        height as u32,
-        &q.palette,
-        &q.indices,
-        q.transparent,
+    let q = quant::quantize_rgba(
+        &rgba,
+        width as usize,
+        height as usize,
+        opts.colors,
+        opts.dither,
     );
+    let out = pngw::write_indexed_png(width, height, &q.palette, &q.indices, q.transparent);
 
     Ok(Compressed {
         bytes: out,
@@ -62,6 +91,7 @@ pub fn compress_png(data: &[u8], opts: &Options) -> Result<Compressed> {
             q.palette.len(),
             if opts.dither { " + 误差扩散" } else { "" }
         ),
+        info: image_info,
     })
 }
 

@@ -27,6 +27,20 @@ pub fn format_ratio(original: u64, compressed: u64) -> String {
     format!("{:+.1}%", delta)
 }
 
+/// 缩小百分比文本：面向用户的口语化表达
+pub fn format_shrink(original: u64, compressed: u64) -> String {
+    if original == 0 || compressed == original {
+        return "体积不变".to_string();
+    }
+    if compressed < original {
+        let pct = (original - compressed) as f64 / original as f64 * 100.0;
+        format!("缩小 {:.1}%", pct)
+    } else {
+        let pct = (compressed - original) as f64 / original as f64 * 100.0;
+        format!("增大 {:.1}%", pct)
+    }
+}
+
 /// 是否启用 ANSI 颜色
 fn colors_enabled() -> bool {
     static ENABLED: OnceLock<bool> = OnceLock::new();
@@ -100,5 +114,12 @@ mod tests {
         assert_eq!(format_ratio(1000, 1200), "+20.0%"); // 体积反增
         assert_eq!(format_ratio(1000, 1000), "+0.0%");
         assert_eq!(format_ratio(0, 0), "0%");
+    }
+
+    #[test]
+    fn format_shrink_works() {
+        assert_eq!(format_shrink(1000, 300), "缩小 70.0%");
+        assert_eq!(format_shrink(1000, 1200), "增大 20.0%");
+        assert_eq!(format_shrink(1000, 1000), "体积不变");
     }
 }

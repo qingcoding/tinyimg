@@ -3,14 +3,24 @@
 use std::fs;
 use std::path::PathBuf;
 
-use tinyimg::compress::{compress_bytes, detect_format, process_file, Format, Options};
+use tinyimg::compress::{compress_bytes, detect_format, process_file, Format, Options, OutputFormat};
 use tinyimg::pngw::{crc32, write_indexed_png, write_rgba_png};
 
 fn default_options() -> Options {
     Options {
         colors: 256,
-        jpeg_quality: 88,
+        quality: 88,
         dither: false,
+        output_format: OutputFormat::Auto,
+    }
+}
+
+fn webp_options() -> Options {
+    Options {
+        colors: 256,
+        quality: 88,
+        dither: false,
+        output_format: OutputFormat::WebP,
     }
 }
 
@@ -79,8 +89,9 @@ fn png_quantization_respects_budget() {
     let original = write_rgba_png(200, 200, &rgba);
     let opts = Options {
         colors: 16,
-        jpeg_quality: 88,
+        quality: 88,
         dither: false,
+        output_format: OutputFormat::Auto,
     };
     let compressed = compress_bytes(&original, &opts).expect("压缩失败");
 
@@ -154,6 +165,9 @@ fn jpeg_pipeline_shrinks_and_decodes() {
         compressed.bytes.len()
     );
     assert!(compressed.detail.contains("q88"), "detail: {}", compressed.detail);
+    assert_eq!(compressed.info.in_format, Format::Jpeg);
+    assert_eq!(compressed.info.width, 320);
+    assert_eq!(compressed.info.height, 240);
 
     // 压缩产物应可被解码
     let mut decoder = zune_jpeg::JpegDecoder::new(&compressed.bytes[..]);
@@ -162,6 +176,141 @@ fn jpeg_pipeline_shrinks_and_decodes() {
     assert_eq!((info.width, info.height), (320, 240));
     let pixels = decoder.decode().expect("JPEG 应可解码");
     assert_eq!(pixels.len(), 320 * 240 * 3);
+}
+
+// ---------- WebP 输出 ----------
+
+#[cfg(feature = "webp")]
+fn is_webp(data: &[u8]) -> bool {
+    data.len() > 12 && &data[0..4] == b"RIFF" && &data[8..12] == b"WEBP"
+}
+
+#[cfg(feature = "webp")]
+#[test]
+fn png_to_webp_output() {
+    let rgba = gradient_rgba(400, 300);
+    let original = write_rgba_png(400, 300, &rgba);
+    let compressed = compress_bytes(&original, &webp_options()).expect("压缩失败");
+
+    assert!(is_webp(&compressed.bytes), "输出应为 WebP（RIFF/WEBP 魔术字）");
+    assert!(
+        compressed.bytes.len() < original.len(),
+        "WebP 应更小: {} -> {}",
+        original.len(),
+        compressed.bytes.len()
+    );
+    assert!(compressed.detail.contains("WebP"), "detail: {}", compressed.detail);
+    assert_eq!(compressed.info.in_format, Format::Png);
+    assert_eq!(compressed.info.out_format, tinyimg::compress::OutFormat::WebP);
+}
+
+#[cfg(feature = "webp")]
+#[test]
+fn jpeg_to_webp_output() {
+    let rgba = gradient_rgba(320, 240);
+    let rgb: Vec<u8> = rgba.chunks_exact(4).flat_map(|p| [p[0], p[1], p[2]]).collect();
+    let mut original = Vec::new();
+    {
+        let encoder = jpeg_encoder::Encoder::new(&mut original, 95);
+        encoder
+            .encode(&rgb, 320, 240, jpeg_encoder::ColorType::Rgb)
+            .unwrap();
+    }
+
+    let compressed = compress_bytes(&original, &webp_options()).expect("压缩失败");
+    assert!(is_webp(&compressed.bytes), "输出应为 WebP");
+    assert!(
+        compressed.bytes.len() < original.len(),
+        "WebP 应更小: {} -> {}",
+        original.len(),
+        compressed.bytes.len()
+    );
+    assert_eq!(compressed.info.out_format, tinyimg::compress::OutFormat::WebP);
+}
+
+#[cfg(feature = "webp")]
+#[test]
+fn flat_art_webp_uses_lossless() {
+    // 4 色扁平图 → WebP 应走无损编码（守住硬边）
+    let colors = [
+        [255u8, 0, 0, 255],
+        [0, 255, 0, 255],
+        [0, 0, 255, 255],
+        [255, 255, 255, 255],
+    ];
+    let mut rgba = Vec::new();
+    for block in 0..4 {
+        for _ in 0..64 {
+            rgba.extend_from_slice(&colors[block]);
+        }
+    }
+    let original = write_rgba_png(16, 16, &rgba);
+    let compressed = compress_bytes(&original, &webp_options()).expect("压缩失败");
+    assert!(is_webp(&compressed.bytes), "输出应为 WebP");
+    assert!(
+        compressed.detail.contains("无损"),
+        "扁平图应走无损编码，实际: {}",
+        compressed.detail
+    );
+    // 无损编码应严格小于原图（否则体积守卫会跳过，这里只验证编码本身合理）
+    assert!(compressed.bytes.len() < original.len());
+}
+
+#[cfg(feature = "webp")]
+#[test]
+fn photo_webp_uses_lossy() {
+    // 渐变照片（远超 256 色）→ WebP 应走有损编码
+    let rgba = gradient_rgba(200, 200);
+    let original = write_rgba_png(200, 200, &rgba);
+    let compressed = compress_bytes(&original, &webp_options()).expect("压缩失败");
+    assert!(
+        compressed.detail.contains("有损"),
+        "照片应走有损编码，实际: {}",
+        compressed.detail
+    );
+}
+
+#[cfg(feature = "webp")]
+#[test]
+fn process_file_webp_extension() {
+    let dir = temp_dir("webp");
+    let rgba = gradient_rgba(300, 200);
+    let png = write_rgba_png(300, 200, &rgba);
+    let input = dir.join("pic.png");
+    fs::write(&input, &png).unwrap();
+
+    let outcome = process_file(&input, None, false, &webp_options());
+    match outcome {
+        tinyimg::compress::Outcome::Done { output, .. } => {
+            assert_eq!(output.file_name().unwrap(), "pic-min.webp");
+            assert!(output.exists());
+            let data = fs::read(&output).unwrap();
+            assert!(is_webp(&data), "落盘文件应为 WebP");
+        }
+        _ => panic!("应成功"),
+    }
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[cfg(feature = "webp")]
+#[test]
+fn process_file_webp_to_output_dir() {
+    let dir = temp_dir("webpdir");
+    let out_dir = dir.join("out");
+    fs::create_dir_all(&out_dir).unwrap();
+    let rgba = gradient_rgba(300, 200);
+    let png = write_rgba_png(300, 200, &rgba);
+    let input = dir.join("pic.png");
+    fs::write(&input, &png).unwrap();
+
+    let outcome = process_file(&input, Some(&out_dir), false, &webp_options());
+    match outcome {
+        tinyimg::compress::Outcome::Done { output, .. } => {
+            assert_eq!(output, out_dir.join("pic.webp"));
+        }
+        _ => panic!("应成功"),
+    }
+    let _ = fs::remove_dir_all(&dir);
 }
 
 #[test]

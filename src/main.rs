@@ -11,7 +11,7 @@ use rayon::prelude::*;
 
 use tinyimg::cli::Args;
 use tinyimg::compress::{collect_files, process_file, Outcome};
-use tinyimg::util::{bold, dim, format_ratio, format_size, green, pad_name, red, teal};
+use tinyimg::util::{bold, dim, format_shrink, format_size, green, pad_name, red, teal};
 
 fn main() {
     let args = Args::parse();
@@ -31,12 +31,17 @@ fn main() {
     }
 
     println!("{}", bold("图小小 TinyImg v0.1.0 — 本地图片压缩"));
+    let format_desc = match args.format.to_lowercase().as_str() {
+        "webp" | "w" => "WebP（扁平图自动无损）",
+        _ => "auto（跟随输入）",
+    };
     println!(
         "{}",
         dim(&format!(
-            "档位: {} 色 / JPEG q{} · 共 {} 个文件",
+            "档位: {} 色 / 有损 q{} · 输出: {} · 共 {} 个文件",
             opts.colors,
-            opts.jpeg_quality,
+            opts.quality,
+            format_desc,
             files.len()
         ))
     );
@@ -102,28 +107,36 @@ fn main() {
         match outcome {
             Outcome::Done {
                 input,
+                output,
                 original,
                 compressed,
                 detail,
-                ..
+                info,
             } => {
                 done += 1;
                 total_original += original;
                 total_compressed += compressed;
-                let ratio = format_ratio(*original, *compressed);
-                let ratio_colored = if compressed < original {
-                    green(&ratio)
-                } else {
-                    red(&ratio)
-                };
                 println!(
-                    "  {} {}  {} → {}  {}  {}",
+                    "  {} {}",
                     teal("✓"),
-                    pad_name(&file_name(input), 28),
+                    bold(&file_name(input))
+                );
+                // 第二行：图片信息（尺寸/格式/体积）+ 缩小百分比
+                println!(
+                    "      {}×{} · {} · {} → {} · {} · {}",
+                    dim(&info.width.to_string()),
+                    dim(&info.height.to_string()),
+                    teal(&info.in_format.to_string()),
                     format_size(*original),
+                    teal(&info.out_format.to_string()),
                     format_size(*compressed),
-                    ratio_colored,
+                    green(&format_shrink(*original, *compressed)),
+                );
+                // 第三行：处理细节 + 输出路径
+                println!(
+                    "      {} {}",
                     dim(&format!("[{}]", detail)),
+                    dim(&format!("→ {}", output.display()))
                 );
             }
             Outcome::Skipped { input, reason } => {
@@ -163,9 +176,9 @@ fn main() {
 
     if done > 0 {
         let saved = total_original.saturating_sub(total_compressed);
-        let avg = format_ratio(total_original, total_compressed);
+        let avg = format_shrink(total_original, total_compressed);
         println!(
-            "  {}（平均 {}）",
+            "  {}（平均{}）",
             bold(&format!("共节省 {}", format_size(saved))),
             teal(&avg)
         );

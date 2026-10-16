@@ -18,6 +18,14 @@ zopfli = "0.6"
 zune-core = "0.4"
 zune-jpeg = "0.4"
 
+# WebP 有损编码（libwebp 绑定）。可选依赖：--no-default-features 构建
+# 可得到仅 PNG/JPEG 的 ~1MB 二进制。
+webp = { version = "0.3", default-features = false, optional = true }
+
+[features]
+default = ["webp"]
+webp = ["dep:webp"]
+
 [profile.release]
 opt-level = 3
 lto = true
