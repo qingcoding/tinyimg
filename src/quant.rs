@@ -341,8 +341,9 @@ fn find_semi_slot(semi_slots: &[SemiSlot], key: u32) -> Option<usize> {
     semi_slots.iter().position(|s| s.key == key)
 }
 
-/// 半透明像素近似目标：在「半透明槽 + 基础槽」中按 RGBA 加权距离选最近色。
-/// 距离 = RGB 欧氏距离平方 + alpha 差平方（同尺度相加，alpha 差异不被 RGB 淹没）。
+/// 半透明像素近似目标：仅在半透明专用槽中按 RGBA 距离选最近色。
+/// 半透明槽 alpha 均为 1..254，选最近后解码 alpha 必保留半透明语义，
+/// 不会落至 alpha=255 的基础槽或 alpha=0 的全透明槽。
 fn nearest_rgba_index(
     palette: &[[u8; 4]],
     base_count: usize,
@@ -353,9 +354,10 @@ fn nearest_rgba_index(
     a: u8,
 ) -> u8 {
     let end = base_count + semi_count;
-    let mut best_idx = 0usize;
+    // 退化路径（semi_count==0，调用方保证不发生）返回 base_count（全透明槽），保证索引合法
+    let mut best_idx = base_count;
     let mut best_dist = u64::MAX;
-    for (i, c) in palette[..end].iter().enumerate() {
+    for (i, c) in palette[base_count..end].iter().enumerate() {
         let dr = r as i64 - c[0] as i64;
         let dg = g as i64 - c[1] as i64;
         let db = b as i64 - c[2] as i64;
@@ -363,7 +365,7 @@ fn nearest_rgba_index(
         let dist = (dr * dr + dg * dg + db * db + da * da) as u64;
         if dist < best_dist {
             best_dist = dist;
-            best_idx = i;
+            best_idx = base_count + i;
         }
     }
     best_idx as u8
@@ -373,7 +375,7 @@ fn nearest_rgba_index(
 /// - a==0 → 全透明槽
 /// - a==255 → NeuQuant RGB 最近色（基础槽，经去重重映射）
 /// - 0<a<255 → 先查半透明槽的粗桶精确匹配（同 key 直接用）；
-///   否则在「半透明槽 + 基础槽」中按 RGBA 加权距离选最近（结果按完整 RGBA 缓存）
+///   否则仅在半透明专用槽中按 RGBA 距离选最近（结果按完整 RGBA 缓存）
 ///
 /// 返回 (每像素调色板索引, 走加权近似的半透明像素数)。
 fn map_pixels_semi(
@@ -406,7 +408,7 @@ fn map_pixels_semi(
             indices.push((base_count + slot) as u8);
             continue;
         }
-        // 未命中粗桶：加权最近（完整 RGBA 为 key 缓存）
+        // 未命中粗桶：仅在半透明专用槽中选最近（完整 RGBA 为 key 缓存）
         let full_key = rgba_key(p[0], p[1], p[2], a);
         if let Some(&idx) = semi_cache.get(&full_key) {
             indices.push(idx);
@@ -423,8 +425,9 @@ fn map_pixels_semi(
 
 /// 半透明路径的 Floyd–Steinberg 误差扩散映射：
 /// 量化误差按 7/16 → 右、3/16 → 左下、5/16 → 下、1/16 → 右下 扩散。
-/// 半透明像素同样参与扩散：先按原始 key 查粗桶精确匹配，未命中则按
-/// **调整后** RGB + 原始 alpha 做加权最近；量化误差 = 调整后 RGB − 所选槽 RGB。
+/// 半透明像素同样参与扩散：先按原始 key 查粗桶精确匹配，未命中则仅在
+/// 半透明专用槽中按**调整后** RGB + 原始 alpha 的 RGBA 距离选最近；
+/// 量化误差 = 调整后 RGB − 所选槽 RGB。
 fn map_pixels_semi_dithered(
     rgba: &[u8],
     width: usize,
