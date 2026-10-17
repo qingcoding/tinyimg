@@ -1,0 +1,11 @@
+{
+  "$schema": "../schemas/capability.schema.json",
+  "identifier": "default",
+  "description": "图小小 TinyImg 默认能力集：核心 IPC + 原生文件对话框",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "dialog:default"
+  ]
+}

@@ -1,9 +1,10 @@
 # 图小小 TinyImg
 
 > 对标 [TinyPNG](https://tinypng.com/) 的**本地**图片批量压缩工具。
-> TinyPNG 核心算法（量化 + zopfli + 元数据剥离）的纯 Rust 复刻，CLI 形态，**单文件 1.0 MB**。
+> TinyPNG 核心算法（量化 + zopfli + 元数据剥离）的纯 Rust 复刻。
+> **CLI 单文件 1.3 MB**；另有 **Tauri 桌面端**（GUI），压缩核心与 CLI 完全同一套库。
 
-全程本地处理，图片不外传；压缩核心以库形式提供，GUI（Tauri）阶段可直接复用。
+全程本地处理，图片不外传；压缩核心以库形式提供，CLI 与 GUI（Tauri）直接复用。
 
 ## 快速开始
 
@@ -52,6 +53,27 @@ cargo build --release
 ```
 
 每个成功文件报告三行：文件名 → 图片信息（尺寸 / 输入格式 / 体积 → 输出格式 / 体积 / 缩小百分比）→ 处理细节与输出路径。
+
+## 桌面端 GUI（Tauri）
+
+```bash
+cd src-tauri
+cargo build --release          # 产物：src-tauri/target/release/tinyimg-gui
+./target/release/tinyimg-gui   # 直接运行（前端资源已内嵌，无需 dev server）
+```
+
+GUI 与 CLI 共用同一压缩库（`tinyimg` crate），算法行为完全一致。当前已交付：
+
+- **输入**：选择单个文件 / 选择整个文件夹（原生对话框，文件夹递归扫描），或直接拖入窗口
+- **输出类型**：WebP（默认，照片有损 / 扁平图无损自动分流）/ 跟随输入
+- **输出文件夹**：自选目录；未选择时输出到原文件同目录（文件名加 `-min`，**绝不覆盖原文件**）
+- **记忆上次打开位置**：导入目录、输出目录、输出格式选择持久化于
+  `~/Library/Application Support/cn.tinyimg.desktop/prefs.json`，下次启动自动恢复
+- 队列列表（原体积 / 压缩后 / 压缩率 / 状态）+ 统计面板（已节省、平均压缩率、进度）
+- 蓝绿清新界面，全中文；批量并行压缩，逐文件流式进度
+
+> 前端为原生 HTML/CSS/JS（`src-tauri/ui/`，无构建链），IPC 直连 Tauri internals；
+> 质量档位、前后对比、深浅主题等 PRD 其余需求见「路线图」。
 
 ## 压缩效果（实测）
 
@@ -133,17 +155,34 @@ tinyimg-pc/
 │   │   ├── jpeg.rs       # JPEG 管线（重编码 / WebP 输出）
 │   │   └── webp.rs       # WebP 编码（feature 门控，libwebp）
 │   └── main.rs           # CLI 入口（并行 + 进度 + 报告）
+├── src-tauri/            # Tauri 2 桌面端（复用 src/ 压缩库，不重写算法）
+│   ├── src/
+│   │   ├── lib.rs        # GUI 库入口
+│   │   ├── commands.rs   # IPC 命令（选择器 / 收集 / 批量压缩 / 偏好）
+│   │   ├── prefs.rs      # 上次打开位置等偏好持久化（原子写 JSON）
+│   │   └── main.rs       # Tauri Builder（dialog 插件 + 命令注册）
+│   ├── ui/               # 前端（原生 ES 模块，无构建链）
+│   │   ├── index.html / styles.css / app.js
+│   │   ├── util.js       # 纯函数（可单测）
+│   │   └── ipc.js        # IPC 层（invoke / Channel / 事件监听，可单测）
+│   ├── capabilities/     # Tauri 权限集
+│   ├── icons/            # 应用图标（gen_icons.py 生成）
+│   └── tauri.conf.json
 ├── examples/
 │   ├── gen_samples.rs    # 生成测试样本
 │   └── verify_quality.rs # 像素级画质校验（MAE / PSNR，支持 PNG/JPEG/WebP）
-└── tests/integration.rs  # 端到端测试（21 项）
+└── tests/
+    ├── integration.rs    # CLI/库端到端测试（21 项）
+    └── qa_semi_edge.rs   # 半透明边缘 QA 测试（19 项）
 ```
 
 ## 测试
 
 ```bash
-cargo test                       # 19 项单元测试 + 21 项集成测试（共 40 项）
-cargo build --release --no-default-features   # 精简构建（无 WebP，~1.0 MB）
+cargo test                                  # 库 + CLI：59 项（lib 19 + integration 21 + qa_semi_edge 19）
+cd src-tauri && cargo test --release        # GUI 逻辑：13 项（偏好 / 输出策略 / 压缩管线 / 目录收集）
+cd src-tauri && node tests/ui_logic.test.mjs  # 前端逻辑：9 项（Channel 乱序重排 / 事件监听 / 纯函数）
+cargo build --release --no-default-features # 精简构建（无 WebP，~1.0 MB）
 ```
 
 覆盖：CRC32 标准向量、量化色数预算、透明槽位、半透明量化扩展（≤5% 索引 + tRNS
@@ -155,8 +194,9 @@ WebP 有损/无损分流、输出命名策略（含 .webp 扩展名）、无收�
 
 - [x] **M1 CLI 核心**：PNG 量化 + JPEG 重编码 + zopfli + 元数据剥离
 - [x] **WebP 输出**：`--format webp`，照片有损 / 扁平图无损自动分流
+- [x] **M3 GUI 桌面壳（首批）**：Tauri 2 窗口 + 单文件/文件夹/拖拽导入 + 输出类型（默认 WebP）+ 输出目录 + 记忆上次位置 + 队列与统计
+- [ ] M3 GUI 体验完整：质量档位预设、保留元数据开关、深浅主题、前后对比、Toast 通知（见 `docs/PRD.md`）
 - [ ] M2 画质守卫：SSIM 低于阈值自动提高色数重试（PRD 的"智能回退"完全体）
-- [ ] M3 GUI 桌面壳：Tauri 2.x 窗口 + 拖拽导入 + 前后对比（复用 `src/compress`）
 - [ ] M4 WebP/AVIF 输入支持
 
 ## 设计取舍
@@ -169,5 +209,8 @@ WebP 有损/无损分流、输出命名策略（含 .webp 扩展名）、无收�
 | 半透明 ≤5% 量化扩展 / >5% 真彩回退 | 抠图抗锯齿边缘色系统计聚桶后可无损承受；大面积半透明量化 alpha 是质量事故高发区 |
 | 体积守卫（无收益跳过） | 已优化图片二次压缩可能反而变大 |
 | CLI 先行 | 最小可用形态验证算法效果；GUI 阶段复用压缩核心库 |
+| Tauri 2 + 原生前端（无 React/Vite 构建链） | GUI 壳逻辑薄（选择/列表/统计），原生 ES 模块零构建、零 node_modules；压缩全在 Rust 侧 |
 | WebP 走 libwebp 绑定（feature 门控） | 有损+无损+质量控制只有 libwebp 提供；纯 Rust 方案仅无损；`--no-default-features` 可回到 1.0 MB |
 | 扁平图 WebP 自动无损 | 有损 WebP 糊硬边（logo PSNR 仅 19.7dB），无损反而更小（122 B）且零损失 |
+| GUI 输出目录与输入同目录时强制 `-min` 后缀 | 绝不覆盖原文件（PRD Q1 安全默认）；专用输出目录才允许覆盖同名旧产物 |
+| 偏好存 app_config_dir JSON（原子写） | 比 localStorage 更稳（清缓存不丢），临时文件 + rename 防半写损坏 |

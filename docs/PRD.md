@@ -8,6 +8,7 @@
 |---|---|---|
 | 2026-10-16 v1 | 初版 PRD：Tauri 2.x GUI 形态 | 许清楚 |
 | 2026-10-16 v2 | **用户要求调整为 Rust 实现、包体要小、前期命令行选图** → 交付形态改为 **Rust CLI 优先**（M1 已交付，二进制 1.0 MB），GUI（原 M2-M4）顺延为 M3。压缩管线 P0 需求不受影响 | Bruce |
+| 2026-10-17 v3 | **GUI 首批功能交付**（`src-tauri/`，Tauri 2.12）：输入支持选择单个文件 / 整个文件夹（原生对话框 + 系统拖拽），输出类型可选择且**默认 WebP**，输出文件夹自选，**记忆上次打开位置**（`~/Library/Application Support/cn.tinyimg.desktop/prefs.json`）。前端为原生 HTML/CSS/JS（无构建链），视觉沿用蓝绿清新规范。PRD 其余 P0/P1（三档预设、元数据开关、深浅主题、前后对比、Toast 通知）排入后续迭代 | Bruce |
 
 > 当前实现状态见 `README.md` 与 `docs/DESIGN.md`。
 

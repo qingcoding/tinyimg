@@ -1,0 +1,39 @@
+[package]
+name = "tinyimg-gui"
+version = "0.1.0"
+edition = "2021"
+description = "图小小 TinyImg — 本地图片压缩工具桌面端（Tauri 2）"
+license = "MIT"
+
+[lib]
+name = "tinyimg_gui"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tinyimg-gui"
+path = "src/main.rs"
+
+[dependencies]
+# 压缩核心：直接复用 CLI 背后的库，不重写任何算法
+tinyimg = { path = ".." }
+
+# 批量并行（与 CLI 同一机制）
+rayon = "1"
+
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+# GUI 是重交互桌面应用，保留 panic 默认行为（unwind），
+# 不用根 crate 的 panic="abort" 发布配置。
+# strip + LTO 压包体（Tauri 含 WebView 绑定，默认构建约 10MB）
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "unwind"
