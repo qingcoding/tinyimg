@@ -293,8 +293,8 @@ html, body {
   height: 100vh;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 14px;
-  padding: 16px 20px;
+  gap: 12px;
+  padding: 14px 20px;
 }
 
 /* ---------- 顶栏 ---------- */
@@ -350,6 +350,8 @@ html, body {
   gap: 14px;
   min-height: 0;
 }
+/* 设置项增多（语言/主题）后默认窗高可能放不下，侧栏内部滚动防裁切 */
+.col-side { overflow-y: auto; }
 
 /* ---------- 面板通用 ---------- */
 .panel {
@@ -363,7 +365,7 @@ html, body {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  padding: 14px 18px 10px;
+  padding: 10px 18px 8px;
 }
 .panel-head h2 { font-size: 14px; font-weight: 600; color: var(--ink); }
 .muted { font-size: 12px; color: var(--muted); }
@@ -506,11 +508,11 @@ th.col-size, th.col-ratio { text-align: right; }
 .empty-rows { text-align: center; color: var(--muted); font-size: 13px; padding: 36px 0; }
 
 /* ---------- 右侧：统计 ---------- */
-.stats-panel { padding-bottom: 16px; }
-.stat-hero { padding: 4px 18px 12px; }
-.stat-label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.stats-panel { padding-bottom: 10px; }
+.stat-hero { padding: 2px 18px 6px; }
+.stat-label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 3px; }
 .stat-big {
-  font-size: 34px;
+  font-size: 27px;
   font-weight: 800;
   letter-spacing: -0.5px;
   font-variant-numeric: tabular-nums;
@@ -519,18 +521,18 @@ th.col-size, th.col-ratio { text-align: right; }
   background-clip: text;
   color: transparent;
 }
-.stat-row { display: flex; gap: 10px; padding: 0 18px 12px; }
+.stat-row { display: flex; gap: 10px; padding: 0 18px 6px; }
 .stat-item {
   flex: 1;
   background: var(--stat-item-bg);
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 8px 12px;
 }
 .stat-value { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .stat-value.good { color: var(--good); }
 .progress-track {
-  margin: 0 18px;
+  margin: 0 18px 2px;
   height: 8px;
   border-radius: 999px;
   background: var(--track-bg);
@@ -545,10 +547,10 @@ th.col-size, th.col-ratio { text-align: right; }
 }
 
 /* ---------- 右侧：设置 ---------- */
-.settings-panel { padding-bottom: 16px; }
-.field { padding: 6px 18px 14px; }
-.field-label { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 8px; }
-.field-hint { font-size: 11.5px; color: var(--muted); margin-top: 7px; line-height: 1.5; }
+.settings-panel { padding-bottom: 10px; }
+.field { padding: 2px 18px 7px; }
+.field-label { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 5px; }
+.field-hint { font-size: 11.5px; color: var(--muted); margin-top: 5px; line-height: 1.45; }
 
 .segmented {
   display: flex;
@@ -565,7 +567,7 @@ th.col-size, th.col-ratio { text-align: right; }
   font-size: 13px;
   font-weight: 600;
   color: var(--ink-soft);
-  padding: 7px 0;
+  padding: 6px 0;
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
@@ -600,7 +602,8 @@ th.col-size, th.col-ratio { text-align: right; }
   background: var(--seg-bg);
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 8px 32px 8px 12px;
+  padding: 6px 32px 6px 12px;
+  height: 32px;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
@@ -609,19 +612,19 @@ th.col-size, th.col-ratio { text-align: right; }
 .lang-select option { color: var(--ink); background: var(--card-solid); }
 
 /* 主题色块 */
-.theme-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.theme-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .theme-chip {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--ink-soft);
   background: var(--seg-bg);
   border: 1.5px solid var(--line);
   border-radius: 999px;
-  padding: 5px 11px 5px 7px;
+  padding: 4px 10px 4px 6px;
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s, transform 0.15s;
 }
@@ -633,7 +636,7 @@ th.col-size, th.col-ratio { text-align: right; }
   box-shadow: 0 3px 10px var(--seg-shadow);
 }
 .theme-chip-dot {
-  width: 15px; height: 15px;
+  width: 13px; height: 13px;
   border-radius: 50%;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
   flex: none;
