@@ -163,14 +163,8 @@ function savePrefs() {
   invoke(internals, 'save_prefs', { prefs: state.prefs }).catch(() => {});
 }
 
-function applyPrefs() {
-  // 输出格式
-  formatSeg.querySelectorAll('.seg').forEach((b) =>
-    b.classList.toggle('active', b.dataset.format === state.prefs.outputFormat)
-  );
-  // 语言（下拉选中态）
-  syncLangSelect();
-  // 输出目录展示
+/** 渲染输出目录栏：已选则显示路径，否则显示本地化占位（语言切换时随之刷新） */
+function renderOutputDir() {
   if (state.prefs.lastOutputDir) {
     outputDirPath.textContent = state.prefs.lastOutputDir;
     outputDirPath.classList.add('set');
@@ -180,6 +174,17 @@ function applyPrefs() {
     outputDirPath.classList.remove('set');
     outputDirPath.title = '';
   }
+}
+
+function applyPrefs() {
+  // 输出格式
+  formatSeg.querySelectorAll('.seg').forEach((b) =>
+    b.classList.toggle('active', b.dataset.format === state.prefs.outputFormat)
+  );
+  // 语言（下拉选中态）
+  syncLangSelect();
+  // 输出目录展示
+  renderOutputDir();
   applyI18n();
   applyTheme();
 }
@@ -262,6 +267,7 @@ function applyLocale(code, { persist = false } = {}) {
     savePrefs();
   }
   applyI18n();
+  renderOutputDir();
   rerenderAll();
 }
 

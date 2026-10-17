@@ -16,6 +16,7 @@
   --bg-end: #f7fbfb;
   --accent: #0d9488;
   --accent-2: #0891b2;
+  --accent-run: #0891b2;
   --accent-deep: #0f766e;
   --accent-glow: rgba(13, 148, 136, 0.32);
   --ink: #134e4a;
@@ -60,11 +61,12 @@
   --bg-end: #111827;
   --accent: #22d3ee;
   --accent-2: #0ea5e9;
+  --accent-run: #38bdf8;
   --accent-deep: #67e8f9;
   --accent-glow: rgba(34, 211, 238, 0.28);
   --ink: #e2e8f0;
   --ink-soft: #94a3b8;
-  --muted: #64748b;
+  --muted: #7e8fa6;
   --line: rgba(148, 163, 184, 0.18);
   --card: rgba(30, 41, 59, 0.86);
   --card-solid: rgba(30, 41, 59, 0.95);
@@ -81,7 +83,7 @@
   --scroll-hover: rgba(148, 163, 184, 0.5);
   --good: #34d399;
   --warn: #fbbf24;
-  --bad: #f87171;
+  --bad: #fca5a5;
   --th-bg: rgba(30, 41, 59, 0.92);
   --drop-bg: rgba(30, 41, 59, 0.55);
   --drop-border: rgba(34, 211, 238, 0.35);
@@ -104,6 +106,7 @@
   --bg-end: #fbfaff;
   --accent: #7c3aed;
   --accent-2: #a855f7;
+  --accent-run: #a855f7;
   --accent-deep: #6d28d9;
   --accent-glow: rgba(124, 58, 237, 0.3);
   --ink: #4c1d95;
@@ -146,6 +149,7 @@
   --bg-end: #f5faff;
   --accent: #2563eb;
   --accent-2: #0ea5e9;
+  --accent-run: #0ea5e9;
   --accent-deep: #1d4ed8;
   --accent-glow: rgba(37, 99, 235, 0.3);
   --ink: #1e3a8a;
@@ -188,6 +192,7 @@
   --bg-end: #fff5f6;
   --accent: #e11d48;
   --accent-2: #f43f5e;
+  --accent-run: #f43f5e;
   --accent-deep: #be123c;
   --accent-glow: rgba(225, 29, 72, 0.3);
   --ink: #881337;
@@ -230,6 +235,7 @@
   --bg-end: #f3fbf7;
   --accent: #059669;
   --accent-2: #10b981;
+  --accent-run: #10b981;
   --accent-deep: #047857;
   --accent-glow: rgba(5, 150, 105, 0.3);
   --ink: #064e3b;
@@ -492,7 +498,7 @@ th.col-size, th.col-ratio { text-align: right; }
 }
 .badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .badge-wait { color: var(--ink-soft); background: var(--badge-wait-bg); }
-.badge-run { color: var(--accent-2); background: var(--badge-run-bg); }
+.badge-run { color: var(--accent-run); background: var(--badge-run-bg); }
 .badge-done { color: var(--good); background: var(--badge-done-bg); }
 .badge-skip { color: var(--warn); background: var(--badge-skip-bg); }
 .badge-fail { color: var(--bad); background: var(--badge-fail-bg); }
