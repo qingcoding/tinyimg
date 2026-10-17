@@ -24,7 +24,9 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app"],
+    "targets": ["app", "dmg"],
+    "category": "Photography",
+    "copyright": "© 2026 TinyImg",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

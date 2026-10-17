@@ -60,7 +60,14 @@ cargo build --release
 cd src-tauri
 cargo build --release          # 产物：src-tauri/target/release/tinyimg-gui
 ./target/release/tinyimg-gui   # 直接运行（前端资源已内嵌，无需 dev server）
+
+# 打包为 macOS 应用（.app + .dmg）
+npx @tauri-apps/cli@2 build    # 产物：target/release/bundle/macos/图小小 TinyImg.app 及 bundle/dmg/ 下同名 .dmg
 ```
+
+> 沙箱/无 GUI 权限环境（如 CI、WorkBuddy 沙箱）需加 `CI=true` 跳过 Finder 美化脚本，
+> 并确保 PATH 中是系统真实 `grep`（bundle_dmg.sh 用 `grep -E` 解析 `hdiutil` 输出，
+> toybox 版 grep 会误报 `bad regex`）。
 
 GUI 与 CLI 共用同一压缩库（`tinyimg` crate），算法行为完全一致。当前已交付：
 
@@ -195,6 +202,7 @@ WebP 有损/无损分流、输出命名策略（含 .webp 扩展名）、无收�
 - [x] **M1 CLI 核心**：PNG 量化 + JPEG 重编码 + zopfli + 元数据剥离
 - [x] **WebP 输出**：`--format webp`，照片有损 / 扁平图无损自动分流
 - [x] **M3 GUI 桌面壳（首批）**：Tauri 2 窗口 + 单文件/文件夹/拖拽导入 + 输出类型（默认 WebP）+ 输出目录 + 记忆上次位置 + 队列与统计
+- [x] **macOS 打包**：`tauri build` 产出 `图小小 TinyImg.app`（5.0 MB）+ 压缩 DMG（2.2 MB，含卷图标与 Applications 拖拽安装软链），ad-hoc 签名本机可直接打开
 - [ ] M3 GUI 体验完整：质量档位预设、保留元数据开关、深浅主题、前后对比、Toast 通知（见 `docs/PRD.md`）
 - [ ] M2 画质守卫：SSIM 低于阈值自动提高色数重试（PRD 的"智能回退"完全体）
 - [ ] M4 WebP/AVIF 输入支持
