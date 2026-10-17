@@ -5,6 +5,11 @@
 //! - `collect_paths`：展开目录为待压缩文件列表（复用库的 collect_files）
 //! - `compress_batch`：并行批量压缩，逐文件经 Channel 推送进度
 //! - `get_prefs` / `save_prefs`：上次打开位置与输出格式的记忆
+//! - `reveal_in_finder`：在系统文件管理器中揭示文件（macOS Finder 选中 / Windows 资源管理器 / Linux）
+//! - `copy_image`：复制图片到系统剪贴板（解码为 RGBA 位图，粘贴即原图）
+//!
+//! 线程模型：`reveal_in_finder` / `copy_image` 均为**同步命令**（Tauri 同步命令在主线程执行），
+//! 因为 macOS 的 NSPasteboard（arboard）与 Finder 揭示都要求主线程调用。
 
 use std::path::{Path, PathBuf};
 
@@ -274,6 +279,33 @@ pub async fn compress_batch(
     })
     .await
     .unwrap_or_default()
+}
+
+// ---------------------------------------------------------------- 行尾操作：揭示 / 复制
+
+/// 在系统文件管理器中揭示文件所在位置（macOS 在 Finder 中选中，Windows 在资源管理器中选中）。
+/// done 行传输出文件、其余行传原文件，由前端决定。
+#[tauri::command]
+pub fn reveal_in_finder(app: AppHandle, path: String) -> Result<(), String> {
+    let p = PathBuf::from(&path);
+    if !p.exists() {
+        return Err(format!("文件不存在: {path}"));
+    }
+    tauri_plugin_opener::OpenerExt::opener(&app)
+        .reveal_item_in_dir(&p)
+        .map_err(|e| format!("无法打开文件管理器: {e}"))
+}
+
+/// 复制图片到系统剪贴板：读文件 → 解码为 RGBA 位图（与压缩管线同一套解码器）→ 写入剪贴板。
+/// 支持 PNG / JPEG / WebP（WebP 即压缩产物格式）。
+#[tauri::command]
+pub fn copy_image(app: AppHandle, path: String) -> Result<(), String> {
+    let data = std::fs::read(&path).map_err(|e| format!("读取失败: {e}"))?;
+    let img = tinyimg::decode::decode_to_rgba(&data).map_err(|e| format!("无法解码图片: {e}"))?;
+    let image = tauri::image::Image::new_owned(img.rgba, img.width, img.height);
+    tauri_plugin_clipboard_manager::ClipboardExt::clipboard(&app)
+        .write_image(&image)
+        .map_err(|e| format!("写入剪贴板失败: {e}"))
 }
 
 // ---------------------------------------------------------------- 偏好

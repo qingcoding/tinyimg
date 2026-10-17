@@ -5,6 +5,7 @@
 
 pub mod cli;
 pub mod compress;
+pub mod decode;
 pub mod pngw;
 pub mod quant;
 pub mod util;

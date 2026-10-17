@@ -22,6 +22,10 @@ rayon = "1"
 
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
+# 行尾「打开目录」：调起系统文件管理器并选中文件
+tauri-plugin-opener = "2"
+# 行尾「复制图片」：写 RGBA 位图到系统剪贴板
+tauri-plugin-clipboard-manager = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

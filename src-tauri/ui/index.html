@@ -28,7 +28,19 @@
           <p data-i18n="app.tagline">本地压缩 · 视觉无损 · 零上传</p>
         </div>
       </div>
-      <div class="topbar-hint" id="engineInfo" data-i18n="engine.ready">压缩引擎就绪</div>
+      <div class="topbar-right">
+        <div class="topbar-hint" id="engineInfo" data-i18n="engine.ready">压缩引擎就绪</div>
+        <!-- 顶部设置菜单：语言切换（原侧栏语言字段已移至此处） -->
+        <div class="menu-wrap" id="settingsMenuWrap">
+          <button class="icon-btn" id="btnSettings" type="button" data-i18n-title="menu.settings" aria-haspopup="true" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
+          <div class="menu-dropdown" id="settingsMenu" role="menu" hidden>
+            <div class="menu-title" data-i18n="menu.settings">设置</div>
+            <div class="menu-list" id="langMenuList"></div>
+          </div>
+        </div>
+      </div>
     </header>
 
     <!-- 主体 -->
@@ -74,6 +86,7 @@
                   <th class="col-size" data-i18n="th.compressed">压缩后</th>
                   <th class="col-ratio" data-i18n="th.ratio">压缩率</th>
                   <th class="col-status" data-i18n="th.status">状态</th>
+                  <th class="col-actions" data-i18n="th.actions">操作</th>
                 </tr>
               </thead>
               <tbody id="fileTbody"></tbody>
@@ -111,8 +124,8 @@
           <div class="field">
             <label class="field-label" data-i18n="field.format">输出类型</label>
             <div class="segmented" id="formatSeg">
-              <button class="seg active" data-format="webp" type="button">WebP</button>
               <button class="seg" data-format="auto" type="button"><span data-i18n="format.auto">跟随输入</span></button>
+              <button class="seg active" data-format="webp" type="button">WebP</button>
             </div>
             <p class="field-hint" data-i18n="field.formatHint">默认 WebP：体积更小，适合网页使用</p>
           </div>
@@ -127,14 +140,6 @@
           </div>
 
           <div class="field">
-            <label class="field-label" data-i18n="field.language">语言</label>
-            <div class="select-wrap">
-              <select class="lang-select" id="langSelect"></select>
-            </div>
-            <p class="field-hint" data-i18n="field.languageHint">默认跟随系统语言，可手动切换</p>
-          </div>
-
-          <div class="field">
             <label class="field-label" data-i18n="field.theme">主题颜色</label>
             <div class="theme-row" id="themeRow"></div>
             <p class="field-hint" data-i18n="field.themeHint">点击色块切换配色，即时生效</p>
@@ -143,14 +148,14 @@
       </aside>
     </main>
 
-    <!-- 底栏 -->
+    <!-- 底栏：信息在左，操作按钮靠右 -->
     <footer class="bottombar">
+      <span class="bottom-info" id="bottomInfo">共 0 个文件</span>
       <button class="btn btn-primary btn-run" id="btnRun" type="button" disabled>
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>
         开始压缩
       </button>
       <button class="btn btn-ghost" id="btnClear" type="button" disabled data-i18n="btn.clear">清空列表</button>
-      <span class="bottom-info" id="bottomInfo">共 0 个文件</span>
     </footer>
   </div>
 

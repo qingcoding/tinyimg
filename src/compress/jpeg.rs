@@ -103,8 +103,8 @@ pub fn compress_jpeg(data: &[u8], opts: &Options) -> Result<Compressed> {
     })
 }
 
-/// 将 JPEG 解码像素统一转为 RGBA（供 WebP 编码使用）
-fn to_rgba(pixels: &[u8], colorspace: Option<ColorSpace>) -> Vec<u8> {
+/// 将 JPEG 解码像素统一转为 RGBA（供 WebP 编码与 decode 模块复用）
+pub(crate) fn to_rgba(pixels: &[u8], colorspace: Option<ColorSpace>) -> Vec<u8> {
     match colorspace {
         Some(ColorSpace::Luma) => pixels.iter().flat_map(|&g| [g, g, g, 255]).collect(),
         Some(ColorSpace::RGB) => pixels

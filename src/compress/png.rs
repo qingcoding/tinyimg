@@ -102,7 +102,8 @@ pub fn compress_png(data: &[u8], opts: &Options) -> Result<Compressed> {
 }
 
 /// 将 png crate 归一化后的 8-bit 像素统一转为 RGBA
-fn to_rgba(bytes: &[u8], color_type: PngColorType) -> Result<Vec<u8>> {
+///（decode 模块复用同一实现，保证压缩与解码的像素口径一致）
+pub(crate) fn to_rgba(bytes: &[u8], color_type: PngColorType) -> Result<Vec<u8>> {
     let pixel_count = match color_type {
         PngColorType::Rgba | PngColorType::GrayscaleAlpha => bytes.len() / 4,
         PngColorType::Rgb => bytes.len() / 3,

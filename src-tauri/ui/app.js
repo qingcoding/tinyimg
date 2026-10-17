@@ -58,8 +58,10 @@ const btnRun = $('btnRun');
 const btnClear = $('btnClear');
 const outputDirPath = $('outputDirPath');
 const formatSeg = $('formatSeg');
-const langSelect = $('langSelect');
 const themeRow = $('themeRow');
+const btnSettings = $('btnSettings');
+const settingsMenu = $('settingsMenu');
+const langMenuList = $('langMenuList');
 const statSaved = $('statSaved');
 const statRatio = $('statRatio');
 const statDone = $('statDone');
@@ -93,7 +95,15 @@ function renderList() {
       <td class="col-size">${fmtSize(e.size)}</td>
       <td class="col-size" data-cell="comp">—</td>
       <td class="col-ratio" data-cell="ratio">—</td>
-      <td class="col-status" data-cell="status"><span class="badge badge-wait">${t('status.wait')}</span></td>`;
+      <td class="col-status" data-cell="status"><span class="badge badge-wait">${t('status.wait')}</span></td>
+      <td class="col-actions">
+        <button class="row-icon" type="button" data-act="reveal" title="${esc(t('action.reveal'))}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </button>
+        <button class="row-icon" type="button" data-act="copy" title="${esc(t('action.copy'))}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+      </td>`;
     fileTbody.appendChild(tr);
     rowEls.set(e.path, tr);
     if (e.result) applyResultToRow(e);
@@ -181,24 +191,58 @@ function applyPrefs() {
   formatSeg.querySelectorAll('.seg').forEach((b) =>
     b.classList.toggle('active', b.dataset.format === state.prefs.outputFormat)
   );
-  // 语言（下拉选中态）
-  syncLangSelect();
   // 输出目录展示
   renderOutputDir();
+  // applyI18n 内部会重建语言菜单勾选态与主题色块
   applyI18n();
   applyTheme();
 }
 
+// ---------------------------------------------------------------- 顶部设置菜单
+
+/** 打开 / 关闭设置菜单（语言项） */
+function toggleSettingsMenu() {
+  settingsMenu.hidden ? openSettingsMenu() : closeSettingsMenu();
+}
+
+function openSettingsMenu() {
+  settingsMenu.hidden = false;
+  btnSettings.setAttribute('aria-expanded', 'true');
+}
+
+function closeSettingsMenu() {
+  settingsMenu.hidden = true;
+  btnSettings.setAttribute('aria-expanded', 'false');
+}
+
 // ---------------------------------------------------------------- 语言与主题
 
-/** 填充语言下拉选项（显示各语言母语名） */
-function buildLangOptions() {
-  langSelect.innerHTML = '';
+/** 填充顶部设置菜单的语言项（母语名 + 当前项勾选），每次语言切换后重建 */
+function buildLangMenu() {
+  langMenuList.innerHTML = '';
   for (const { code, native } of LOCALES) {
-    const opt = document.createElement('option');
-    opt.value = code;
-    opt.textContent = native;
-    langSelect.appendChild(opt);
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'menu-item';
+    item.dataset.code = code;
+    item.setAttribute('role', 'menuitem');
+    if (code === translator.locale) {
+      item.classList.add('active');
+      item.setAttribute('aria-current', 'true');
+    }
+    const label = document.createElement('span');
+    label.className = 'menu-item-label';
+    label.textContent = native;
+    const check = document.createElement('span');
+    check.className = 'menu-item-check';
+    check.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    item.append(label, check);
+    item.addEventListener('click', () => {
+      applyLocale(code, { persist: true });
+      closeSettingsMenu();
+    });
+    langMenuList.appendChild(item);
   }
 }
 
@@ -222,10 +266,6 @@ function buildThemeChips() {
   }
 }
 
-function syncLangSelect() {
-  langSelect.value = translator.locale;
-}
-
 function syncThemeChips() {
   themeRow.querySelectorAll('.theme-chip').forEach((chip) =>
     chip.classList.toggle('active', chip.dataset.themeId === state.prefs.theme)
@@ -244,7 +284,7 @@ function applyI18n() {
   document.title = t('app.title');
   buildThemeChips();
   syncThemeChips();
-  syncLangSelect();
+  buildLangMenu();
 }
 
 /** 应用主题（data-theme 驱动 CSS 变量整块切换） */
@@ -397,11 +437,18 @@ formatSeg.addEventListener('click', (ev) => {
   applyPrefs();
 });
 
-langSelect.addEventListener('change', () => {
-  const value = langSelect.value;
-  state.prefs.language = value;
-  savePrefs();
-  applyLocale(value);
+btnSettings.addEventListener('click', (ev) => {
+  ev.stopPropagation();
+  toggleSettingsMenu();
+});
+
+// 点击菜单外部 / 按 Esc 关闭设置菜单
+document.addEventListener('click', (ev) => {
+  if (settingsMenu.hidden) return;
+  if (!ev.target.closest('.menu-wrap')) closeSettingsMenu();
+});
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape' && !settingsMenu.hidden) closeSettingsMenu();
 });
 
 themeRow.addEventListener('click', (ev) => {
@@ -416,6 +463,26 @@ themeRow.addEventListener('click', (ev) => {
 });
 
 btnRun.addEventListener('click', runCompress);
+
+// 行尾操作图标（事件委托）：done 行操作压缩产物，其余行操作原文件
+fileTbody.addEventListener('click', (ev) => {
+  const btn = ev.target.closest('.row-icon');
+  if (!btn) return;
+  const tr = btn.closest('tr');
+  const entry = tr?.dataset.path ? state.entries.get(tr.dataset.path) : null;
+  if (!entry) return;
+  const target =
+    entry.result?.status === 'done' && entry.result.output
+      ? entry.result.output
+      : entry.path;
+  const act = btn.dataset.act;
+  if (act !== 'reveal' && act !== 'copy') return;
+  invoke(internals, act === 'reveal' ? 'reveal_in_finder' : 'copy_image', { path: target })
+    .then(() => showToast(t(act === 'reveal' ? 'toast.revealOk' : 'toast.copyOk')))
+    .catch((err) =>
+      showToast(t(act === 'reveal' ? 'toast.revealFail' : 'toast.copyFail', { err: err?.message || err }))
+    );
+});
 
 btnClear.addEventListener('click', () => {
   if (state.busy) return;
@@ -446,8 +513,7 @@ onTauriEvent(internals, 'tauri://drag-drop', async (evt) => {
 // ---------------------------------------------------------------- 启动
 
 (async function init() {
-  // 先渲染语言 / 主题控件，避免首闪空控件
-  buildLangOptions();
+  // 先渲染主题控件，避免首闪空控件
   buildThemeChips();
   try {
     const prefs = await invoke(internals, 'get_prefs');
