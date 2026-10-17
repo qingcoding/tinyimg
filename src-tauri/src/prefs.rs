@@ -1,7 +1,10 @@
-//! 偏好持久化：记住上次打开位置（导入目录 / 输出目录）与输出格式选择。
+//! 偏好持久化：记住上次打开位置（导入目录 / 输出目录）、输出格式、
+//! 界面语言与主题配色。
 //!
 //! 存储于 `app_config_dir()/prefs.json`（macOS: `~/Library/Application
 //! Support/cn.tinyimg.desktop/`），原子写入（临时文件 + rename）防半写损坏。
+//! `language` / `theme` 由前端负责归一化与校验（合法值集合见 ui/i18n.js），
+//! Rust 侧仅透传存储。
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -20,6 +23,10 @@ pub struct Prefs {
     pub last_output_dir: Option<String>,
     /// 输出格式："webp"（默认）或 "auto"（跟随输入）
     pub output_format: String,
+    /// 界面语言（BCP-47 归一化后的 code，如 "zh-CN" / "en"）；None = 跟随系统语言
+    pub language: Option<String>,
+    /// 主题配色 id（teal / dark / violet / ocean / rose / forest）；None 时前端回落默认
+    pub theme: Option<String>,
 }
 
 impl Default for Prefs {
@@ -28,6 +35,8 @@ impl Default for Prefs {
             last_input_dir: None,
             last_output_dir: None,
             output_format: "webp".to_string(),
+            language: None,
+            theme: Some("teal".to_string()),
         }
     }
 }
@@ -95,6 +104,9 @@ mod tests {
         assert_eq!(p.output_format, "webp");
         assert!(p.last_input_dir.is_none());
         assert!(p.last_output_dir.is_none());
+        // 语言 / 主题默认值：跟随系统 + teal
+        assert!(p.language.is_none());
+        assert_eq!(p.theme.as_deref(), Some("teal"));
         assert_eq!(p.output_format(), OutputFormat::WebP);
     }
 
@@ -121,18 +133,46 @@ mod tests {
             last_input_dir: Some("/Users/bruce/Pictures".into()),
             last_output_dir: Some("/Users/bruce/Desktop/out".into()),
             output_format: "auto".into(),
+            language: Some("en".into()),
+            theme: Some("ocean".into()),
         };
         let text = serialize(&prefs).unwrap();
         assert!(text.contains("lastInputDir"), "序列化应为 camelCase: {text}");
+        assert!(text.contains("\"language\": \"en\""), "language 应为 camelCase: {text}");
+        assert!(text.contains("\"theme\": \"ocean\""), "theme 应为 camelCase: {text}");
         let back = deserialize(&text).unwrap();
         assert_eq!(back.last_input_dir.as_deref(), Some("/Users/bruce/Pictures"));
         assert_eq!(back.last_output_dir.as_deref(), Some("/Users/bruce/Desktop/out"));
         assert_eq!(back.output_format(), OutputFormat::Auto);
+        assert_eq!(back.language.as_deref(), Some("en"));
+        assert_eq!(back.theme.as_deref(), Some("ocean"));
     }
 
     #[test]
     fn deserialize_corrupt_json_errors() {
         assert!(deserialize("{ not json").is_err());
+    }
+
+    #[test]
+    fn deserialize_legacy_json_fills_language_theme_defaults() {
+        // 向后兼容：旧版偏好（无 language / theme 字段）反序列化后取默认值
+        let back = deserialize(r#"{"lastInputDir":"/a","lastOutputDir":"/b","outputFormat":"webp"}"#)
+            .unwrap();
+        assert_eq!(back.last_input_dir.as_deref(), Some("/a"));
+        assert_eq!(back.output_format(), OutputFormat::WebP);
+        assert!(back.language.is_none());
+        assert_eq!(back.theme.as_deref(), Some("teal"));
+    }
+
+    #[test]
+    fn invalid_theme_value_passes_through() {
+        // Rust 侧不做主题校验：非法值原样保存，由前端负责回落
+        let prefs = Prefs {
+            theme: Some("neon".into()),
+            ..Default::default()
+        };
+        let back = deserialize(&serialize(&prefs).unwrap()).unwrap();
+        assert_eq!(back.theme.as_deref(), Some("neon"));
     }
 
     #[test]

@@ -1,11 +1,21 @@
 // 前端逻辑单测（Node 直接运行，无测试框架）：
 //   node tests/ui_logic.test.mjs
-// 覆盖 util.js 纯函数与 ipc.js 的 Channel 有序投递 / end 清理 / 事件监听。
+// 覆盖 util.js 纯函数、ipc.js 的 Channel 有序投递 / end 清理 / 事件监听，
+// 以及 i18n.js 的语言探测、归一化、插值、字典一致性与主题清单。
 // app.js 依赖 DOM 不在本测试范围（由应用运行期验证）。
 
 import assert from 'node:assert/strict';
 import { fmtSize, esc, baseName, dirName, ratioText } from '../ui/util.js';
 import { makeChannel, onTauriEvent, invoke } from '../ui/ipc.js';
+import {
+  LOCALES,
+  FALLBACK_LOCALE,
+  THEME_IDS,
+  DICTS,
+  normalizeLocale,
+  detectLocale,
+  createTranslator,
+} from '../ui/i18n.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -145,6 +155,79 @@ await (async () => {
 })().catch((err) => {
   console.error(`  ✗ onTauriEvent: ${err.message}`);
   process.exitCode = 1;
+});
+
+// ---------- i18n ----------
+
+console.log('i18n.js');
+
+test('detectLocale 按优先级取首个可归一化语言', () => {
+  assert.equal(detectLocale(['zh-CN', 'en']), 'zh-CN');
+  assert.equal(detectLocale(['en-US']), 'en');
+  assert.equal(detectLocale(['ja-JP']), 'ja');
+  assert.equal(detectLocale(['zh-Hant-TW']), 'zh-TW');
+  assert.equal(detectLocale(['ar-SA', 'fr']), 'fr'); // 首个不可归一化，跳过
+  assert.equal(detectLocale([]), 'zh-CN');
+  assert.equal(detectLocale('de'), 'de'); // 单个字符串亦可
+  assert.equal(detectLocale(['xx-YY']), 'zh-CN');
+  assert.equal(detectLocale(null), 'zh-CN');
+});
+
+test('normalizeLocale 归一支集与大小写', () => {
+  assert.equal(normalizeLocale('zh-Hans-CN'), 'zh-CN');
+  assert.equal(normalizeLocale('ZH-tw'), 'zh-TW'); // 大小写不敏感
+  assert.equal(normalizeLocale('zh'), 'zh-CN');
+  assert.equal(normalizeLocale('zh-SG'), 'zh-CN');
+  assert.equal(normalizeLocale('zh-Hant-HK'), 'zh-TW');
+  assert.equal(normalizeLocale('pt-BR'), 'pt');
+  assert.equal(normalizeLocale('en-US'), 'en');
+  assert.equal(normalizeLocale('it'), null); // 不支持的语言
+  assert.equal(normalizeLocale(''), null);
+  assert.equal(normalizeLocale(null), null);
+});
+
+test('t() 插值、缺 key 回落与未知语言回落', () => {
+  for (const { code } of LOCALES) {
+    const tr = createTranslator(code);
+    assert.ok(tr.t('list.count', { n: 5 }).includes('5'), `${code} 的 list.count 应含 5`);
+  }
+  // 缺 key → 回落中文；再缺 → key 本身
+  assert.equal(createTranslator('en').t('no.such.key'), 'no.such.key');
+  // 未知语言整体回落 zh-CN 字典
+  const xx = createTranslator('xx');
+  assert.equal(xx.t('btn.run'), DICTS[FALLBACK_LOCALE]['btn.run']);
+  assert.equal(xx.t('btn.run'), '开始压缩');
+  // 插值变量缺失时保留占位符
+  assert.equal(createTranslator('zh-CN').t('list.count'), '{n} 个文件');
+});
+
+test('字典 key 全集各语言一致（防漏翻）', () => {
+  const base = Object.keys(DICTS[FALLBACK_LOCALE]).sort();
+  for (const { code } of LOCALES) {
+    assert.deepEqual(Object.keys(DICTS[code]).sort(), base, `${code} 的 key 集合应与 zh-CN 一致`);
+  }
+});
+
+test('THEME_IDS 恰好六套且非空', () => {
+  assert.equal(THEME_IDS.length, 6);
+  for (const id of ['teal', 'dark', 'violet', 'ocean', 'rose', 'forest']) {
+    assert.ok(THEME_IDS.includes(id), `应包含主题 ${id}`);
+  }
+  for (const id of THEME_IDS) {
+    assert.ok(typeof id === 'string' && id.length > 0, `主题 id 应为非空字符串: ${id}`);
+  }
+});
+
+test('LOCALES 至少 10 种、code 唯一且均有字典', () => {
+  assert.ok(LOCALES.length >= 10, '至少 10 种语言');
+  const codes = new Set();
+  for (const l of LOCALES) {
+    assert.ok(l.code && l.native, 'locale 需含 code 与 native');
+    assert.ok(!codes.has(l.code), `code 重复: ${l.code}`);
+    codes.add(l.code);
+    assert.ok(DICTS[l.code], `${l.code} 缺少字典`);
+  }
+  assert.equal(LOCALES[0].code, 'zh-CN', 'zh-CN 应为默认首选');
 });
 
 console.log(`\n前端逻辑测试：${passed} 项通过${process.exitCode ? '（存在失败）' : ''}`);

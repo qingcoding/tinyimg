@@ -14,8 +14,8 @@
         <svg class="brand-mark" viewBox="0 0 48 48" aria-hidden="true">
           <defs>
             <linearGradient id="pg_brand" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#0d9488"/>
-              <stop offset="1" stop-color="#0891b2"/>
+              <stop offset="0"/>
+              <stop offset="1"/>
             </linearGradient>
           </defs>
           <rect x="2" y="2" width="44" height="44" rx="11" fill="url(#pg_brand)"/>
@@ -24,11 +24,11 @@
           <rect x="13" y="33" width="22" height="4" rx="2" fill="#fff" opacity="0.92"/>
         </svg>
         <div class="brand-text">
-          <h1>图小小 TinyImg</h1>
-          <p>本地压缩 · 视觉无损 · 零上传</p>
+          <h1 data-i18n="app.title">图小小 TinyImg</h1>
+          <p data-i18n="app.tagline">本地压缩 · 视觉无损 · 零上传</p>
         </div>
       </div>
-      <div class="topbar-hint" id="engineInfo">压缩引擎就绪</div>
+      <div class="topbar-hint" id="engineInfo" data-i18n="engine.ready">压缩引擎就绪</div>
     </header>
 
     <!-- 主体 -->
@@ -44,16 +44,16 @@
                 <path d="m3 16 4.5-4.5 3.5 3.5 3-3L21 17"/>
               </svg>
             </div>
-            <p class="dropzone-title">拖入图片或文件夹到这里</p>
-            <p class="dropzone-sub">也可以点击下方按钮选择 · 支持 PNG / JPEG · 全程本地处理</p>
+            <p class="dropzone-title" data-i18n="drop.title">拖入图片或文件夹到这里</p>
+            <p class="dropzone-sub" data-i18n="drop.sub">也可以点击下方按钮选择 · 支持 PNG / JPEG · 全程本地处理</p>
             <div class="dropzone-actions">
               <button class="btn btn-primary" id="btnPickFiles" type="button">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 3v5h5"/><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2z"/></svg>
-                选择单个文件
+                <span data-i18n="btn.pickFiles">选择单个文件</span>
               </button>
               <button class="btn btn-ghost" id="btnPickFolder" type="button">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-                选择整个文件夹
+                <span data-i18n="btn.pickFolder">选择整个文件夹</span>
               </button>
             </div>
           </div>
@@ -62,18 +62,18 @@
         <!-- 文件列表 -->
         <div class="panel list-panel" id="listPanel" hidden>
           <div class="panel-head">
-            <h2>压缩队列</h2>
+            <h2 data-i18n="list.title">压缩队列</h2>
             <span class="muted" id="listCount"></span>
           </div>
           <div class="table-wrap">
             <table class="file-table">
               <thead>
                 <tr>
-                  <th class="col-name">文件</th>
-                  <th class="col-size">原体积</th>
-                  <th class="col-size">压缩后</th>
-                  <th class="col-ratio">压缩率</th>
-                  <th class="col-status">状态</th>
+                  <th class="col-name" data-i18n="th.name">文件</th>
+                  <th class="col-size" data-i18n="th.original">原体积</th>
+                  <th class="col-size" data-i18n="th.compressed">压缩后</th>
+                  <th class="col-ratio" data-i18n="th.ratio">压缩率</th>
+                  <th class="col-status" data-i18n="th.status">状态</th>
                 </tr>
               </thead>
               <tbody id="fileTbody"></tbody>
@@ -86,18 +86,18 @@
       <aside class="col-side">
         <!-- 统计 -->
         <div class="panel stats-panel">
-          <div class="panel-head"><h2>压缩统计</h2></div>
+          <div class="panel-head"><h2 data-i18n="stats.title">压缩统计</h2></div>
           <div class="stat-hero">
-            <span class="stat-label">已节省</span>
+            <span class="stat-label" data-i18n="stats.saved">已节省</span>
             <strong class="stat-big" id="statSaved">0 B</strong>
           </div>
           <div class="stat-row">
             <div class="stat-item">
-              <span class="stat-label">平均压缩率</span>
+              <span class="stat-label" data-i18n="stats.avgRatio">平均压缩率</span>
               <strong class="stat-value good" id="statRatio">—</strong>
             </div>
             <div class="stat-item">
-              <span class="stat-label">完成进度</span>
+              <span class="stat-label" data-i18n="stats.progress">完成进度</span>
               <strong class="stat-value" id="statDone">0 / 0</strong>
             </div>
           </div>
@@ -106,24 +106,38 @@
 
         <!-- 输出设置 -->
         <div class="panel settings-panel">
-          <div class="panel-head"><h2>输出设置</h2></div>
+          <div class="panel-head"><h2 data-i18n="settings.title">输出设置</h2></div>
 
           <div class="field">
-            <label class="field-label">输出类型</label>
+            <label class="field-label" data-i18n="field.format">输出类型</label>
             <div class="segmented" id="formatSeg">
               <button class="seg active" data-format="webp" type="button">WebP</button>
               <button class="seg" data-format="auto" type="button">跟随输入</button>
             </div>
-            <p class="field-hint">默认 WebP：体积更小，适合网页使用</p>
+            <p class="field-hint" data-i18n="field.formatHint">默认 WebP：体积更小，适合网页使用</p>
           </div>
 
           <div class="field">
-            <label class="field-label">输出文件夹</label>
+            <label class="field-label" data-i18n="field.outputDir">输出文件夹</label>
             <div class="dir-row">
               <span class="dir-path" id="outputDirPath">未选择</span>
-              <button class="btn btn-small btn-ghost" id="btnPickOutput" type="button">选择目录</button>
+              <button class="btn btn-small btn-ghost" id="btnPickOutput" type="button"><span data-i18n="btn.pickOutput">选择目录</span></button>
             </div>
-            <p class="field-hint">未选择时输出到原文件所在目录（文件名加 -min，不覆盖原文件）</p>
+            <p class="field-hint" data-i18n="field.outputDirHint">未选择时输出到原文件所在目录（文件名加 -min，不覆盖原文件）</p>
+          </div>
+
+          <div class="field">
+            <label class="field-label" data-i18n="field.language">语言</label>
+            <div class="select-wrap">
+              <select class="lang-select" id="langSelect"></select>
+            </div>
+            <p class="field-hint" data-i18n="field.languageHint">默认跟随系统语言，可手动切换</p>
+          </div>
+
+          <div class="field">
+            <label class="field-label" data-i18n="field.theme">主题颜色</label>
+            <div class="theme-row" id="themeRow"></div>
+            <p class="field-hint" data-i18n="field.themeHint">点击色块切换配色，即时生效</p>
           </div>
         </div>
       </aside>
@@ -135,7 +149,7 @@
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>
         开始压缩
       </button>
-      <button class="btn btn-ghost" id="btnClear" type="button" disabled>清空列表</button>
+      <button class="btn btn-ghost" id="btnClear" type="button" disabled data-i18n="btn.clear">清空列表</button>
       <span class="bottom-info" id="bottomInfo">共 0 个文件</span>
     </footer>
   </div>

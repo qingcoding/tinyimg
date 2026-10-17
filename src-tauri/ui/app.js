@@ -3,21 +3,46 @@
 // 模块划分：
 // - util.js：纯函数（体积格式化 / 转义 / 路径处理）
 // - ipc.js ：Tauri IPC 层（invoke / Channel / 事件监听）
+// - i18n.js：多语言字典、语言探测与翻译器（无 DOM 依赖）
 // - app.js ：状态、渲染与交互编排（本文件）
 
 import { fmtSize, esc, baseName, dirName, ratioText } from './util.js';
 import { makeChannel, onTauriEvent, invoke } from './ipc.js';
+import { LOCALES, FALLBACK_LOCALE, THEME_IDS, detectLocale, createTranslator } from './i18n.js';
 
 const internals = window.__TAURI_INTERNALS__;
+
+// 主题色块的内联渐变（accent / accent-2 十六进制值）。
+// 与 styles.css 中各 [data-theme] 块的 --accent / --accent-2 保持一致：
+// 色块需在切换前直接画出目标主题的渐变，无法引用当前主题的 CSS 变量。
+const THEME_ACCENTS = {
+  teal: ['#0d9488', '#0891b2'],
+  dark: ['#22d3ee', '#0ea5e9'],
+  violet: ['#7c3aed', '#a855f7'],
+  ocean: ['#2563eb', '#0ea5e9'],
+  rose: ['#e11d48', '#f43f5e'],
+  forest: ['#059669', '#10b981'],
+};
 
 // ---------------------------------------------------------------- 状态
 
 const state = {
   /** path -> { path, name, dir, size, result } */
   entries: new Map(),
-  prefs: { lastInputDir: null, lastOutputDir: null, outputFormat: 'webp' },
+  prefs: {
+    lastInputDir: null,
+    lastOutputDir: null,
+    outputFormat: 'webp',
+    language: null,
+    theme: 'teal',
+  },
   busy: false,
 };
+
+// ---------------------------------------------------------------- 多语言
+
+let translator = createTranslator(FALLBACK_LOCALE);
+const t = (key, vars) => translator.t(key, vars);
 
 // ---------------------------------------------------------------- DOM
 
@@ -33,6 +58,8 @@ const btnRun = $('btnRun');
 const btnClear = $('btnClear');
 const outputDirPath = $('outputDirPath');
 const formatSeg = $('formatSeg');
+const langSelect = $('langSelect');
+const themeRow = $('themeRow');
 const statSaved = $('statSaved');
 const statRatio = $('statRatio');
 const statDone = $('statDone');
@@ -66,12 +93,12 @@ function renderList() {
       <td class="col-size">${fmtSize(e.size)}</td>
       <td class="col-size" data-cell="comp">—</td>
       <td class="col-ratio" data-cell="ratio">—</td>
-      <td class="col-status" data-cell="status"><span class="badge badge-wait">等待</span></td>`;
+      <td class="col-status" data-cell="status"><span class="badge badge-wait">${t('status.wait')}</span></td>`;
     fileTbody.appendChild(tr);
     rowEls.set(e.path, tr);
     if (e.result) applyResultToRow(e);
   }
-  listCount.textContent = `${entries.length} 个文件`;
+  listCount.textContent = t('list.count', { n: entries.length });
 }
 
 function applyResultToRow(entry) {
@@ -84,17 +111,17 @@ function applyResultToRow(entry) {
   if (r.status === 'done') {
     comp.textContent = fmtSize(r.compressed);
     ratio.innerHTML = `<span class="ratio-good">${ratioText(r.ratio)}</span>`;
-    status.innerHTML = '<span class="badge badge-done">完成</span>';
+    status.innerHTML = `<span class="badge badge-done">${t('status.done')}</span>`;
     tr.title = `${entry.path}\n${r.detail}${r.output ? `\n输出: ${r.output}` : ''}`;
   } else if (r.status === 'skipped') {
     comp.textContent = '—';
     ratio.innerHTML = '<span class="ratio-flat">—</span>';
-    status.innerHTML = '<span class="badge badge-skip">跳过</span>';
+    status.innerHTML = `<span class="badge badge-skip">${t('status.skip')}</span>`;
     tr.title = `${entry.path}\n${r.detail}`;
   } else {
     comp.textContent = '—';
     ratio.innerHTML = '<span class="ratio-flat">—</span>';
-    status.innerHTML = '<span class="badge badge-fail">失败</span>';
+    status.innerHTML = `<span class="badge badge-fail">${t('status.fail')}</span>`;
     tr.title = `${entry.path}\n${r.detail}`;
   }
 }
@@ -110,15 +137,17 @@ function renderStats() {
   statRatio.classList.toggle('good', doneOriginal > 0);
   statDone.textContent = `${done.length} / ${entries.length}`;
   progressBar.style.width = entries.length ? `${(done.length / entries.length) * 100}%` : '0%';
-  bottomInfo.textContent = `共 ${entries.length} 个文件`;
+  bottomInfo.textContent = t('list.count', { n: entries.length });
 }
 
 function updateButtons() {
   btnRun.disabled = state.busy || state.entries.size === 0;
   btnClear.disabled = state.busy || state.entries.size === 0;
   btnRun.innerHTML = state.busy
-    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 9 9" /></svg>压缩中…'
-    : '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>开始压缩';
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 9 9" /></svg>'
+      + esc(t('btn.running'))
+    : '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>'
+      + esc(t('btn.run'));
 }
 
 function showToast(text) {
@@ -139,16 +168,108 @@ function applyPrefs() {
   formatSeg.querySelectorAll('.seg').forEach((b) =>
     b.classList.toggle('active', b.dataset.format === state.prefs.outputFormat)
   );
+  // 语言（下拉选中态）
+  syncLangSelect();
   // 输出目录展示
   if (state.prefs.lastOutputDir) {
     outputDirPath.textContent = state.prefs.lastOutputDir;
     outputDirPath.classList.add('set');
     outputDirPath.title = state.prefs.lastOutputDir;
   } else {
-    outputDirPath.textContent = '未选择';
+    outputDirPath.textContent = t('dir.notSet');
     outputDirPath.classList.remove('set');
     outputDirPath.title = '';
   }
+  applyI18n();
+  applyTheme();
+}
+
+// ---------------------------------------------------------------- 语言与主题
+
+/** 填充语言下拉选项（显示各语言母语名） */
+function buildLangOptions() {
+  langSelect.innerHTML = '';
+  for (const { code, native } of LOCALES) {
+    const opt = document.createElement('option');
+    opt.value = code;
+    opt.textContent = native;
+    langSelect.appendChild(opt);
+  }
+}
+
+/** 生成主题色块（内联该主题 accent 双色渐变小圆点 + 主题名） */
+function buildThemeChips() {
+  themeRow.innerHTML = '';
+  for (const id of THEME_IDS) {
+    const [a1, a2] = THEME_ACCENTS[id] || ['#0d9488', '#0891b2'];
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'theme-chip';
+    chip.dataset.themeId = id;
+    chip.title = t(`theme.${id}`);
+    const dot = document.createElement('span');
+    dot.className = 'theme-chip-dot';
+    dot.style.background = `linear-gradient(135deg, ${a1}, ${a2})`;
+    const label = document.createElement('span');
+    label.textContent = t(`theme.${id}`);
+    chip.append(dot, label);
+    themeRow.appendChild(chip);
+  }
+}
+
+function syncLangSelect() {
+  langSelect.value = translator.locale;
+}
+
+function syncThemeChips() {
+  themeRow.querySelectorAll('.theme-chip').forEach((chip) =>
+    chip.classList.toggle('active', chip.dataset.themeId === state.prefs.theme)
+  );
+}
+
+/** 应用静态文案（data-i18n / data-i18n-title）、html lang、标题与控件选中态 */
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach((el) => {
+    el.title = t(el.dataset.i18nTitle);
+  });
+  document.documentElement.lang = translator.locale;
+  document.title = t('app.title');
+  buildThemeChips();
+  syncThemeChips();
+  syncLangSelect();
+}
+
+/** 应用主题（data-theme 驱动 CSS 变量整块切换） */
+function applyTheme() {
+  const theme = THEME_IDS.includes(state.prefs.theme) ? state.prefs.theme : 'teal';
+  state.prefs.theme = theme;
+  document.documentElement.dataset.theme = theme;
+}
+
+/**
+ * 切换语言：重建翻译器 → 刷新静态文案 → 重渲染动态区域。
+ * @param {string} code 目标语言 code（非法值回落中文）
+ * @param {{ persist?: boolean }} [options] persist=true 时写回偏好
+ */
+function applyLocale(code, { persist = false } = {}) {
+  const locale = LOCALES.some((l) => l.code === code) ? code : FALLBACK_LOCALE;
+  translator = createTranslator(locale);
+  if (persist) {
+    state.prefs.language = locale;
+    savePrefs();
+  }
+  applyI18n();
+  rerenderAll();
+}
+
+/** 语言切换后重渲染所有动态区域 */
+function rerenderAll() {
+  renderList();
+  renderStats();
+  updateButtons();
 }
 
 // ---------------------------------------------------------------- 文件管理
@@ -213,9 +334,9 @@ async function runCompress() {
     const saved = results
       .filter((r) => r.status === 'done')
       .reduce((s, r) => s + (r.original - r.compressed), 0);
-    showToast(`压缩完成 · 成功 ${done} · 跳过 ${skipped} · 失败 ${failed} · 共节省 ${fmtSize(saved)}`);
+    showToast(t('toast.batchDone', { done, skipped, failed, saved: fmtSize(saved) }));
   } catch (err) {
-    showToast(`压缩失败：${err?.message || err}`);
+    showToast(t('toast.batchFail', { err: err?.message || err }));
   } finally {
     state.busy = false;
     updateButtons();
@@ -236,7 +357,7 @@ btnPickFiles.addEventListener('click', async () => {
       savePrefs();
     }
   }
-  if (picked.length > 0 && added === 0) showToast('所选文件已在列表中');
+  if (picked.length > 0 && added === 0) showToast(t('toast.dupFiles'));
 });
 
 btnPickFolder.addEventListener('click', async () => {
@@ -248,8 +369,8 @@ btnPickFolder.addEventListener('click', async () => {
   const added = addEntries(entries);
   state.prefs.lastInputDir = dir;
   savePrefs();
-  if (entries.length === 0) showToast('该文件夹中没有找到 PNG / JPEG 图片');
-  else if (added === 0) showToast('文件夹中的图片都已在列表中');
+  if (entries.length === 0) showToast(t('toast.folderEmpty'));
+  else if (added === 0) showToast(t('toast.folderDup'));
 });
 
 btnPickOutput.addEventListener('click', async () => {
@@ -268,6 +389,24 @@ formatSeg.addEventListener('click', (ev) => {
   state.prefs.outputFormat = btn.dataset.format;
   savePrefs();
   applyPrefs();
+});
+
+langSelect.addEventListener('change', () => {
+  const value = langSelect.value;
+  state.prefs.language = value;
+  savePrefs();
+  applyLocale(value);
+});
+
+themeRow.addEventListener('click', (ev) => {
+  const chip = ev.target.closest('.theme-chip');
+  if (!chip) return;
+  const id = chip.dataset.themeId;
+  if (!THEME_IDS.includes(id)) return;
+  state.prefs.theme = id;
+  savePrefs();
+  applyTheme();
+  applyI18n();
 });
 
 btnRun.addEventListener('click', runCompress);
@@ -294,19 +433,28 @@ onTauriEvent(internals, 'tauri://drag-drop', async (evt) => {
   if (!Array.isArray(paths) || paths.length === 0) return;
   const entries = await invoke(internals, 'collect_paths', { paths }).catch(() => []);
   const added = addEntries(entries);
-  if (entries.length === 0) showToast('拖入的内容中没有可压缩的图片');
-  else if (added === 0) showToast('拖入的图片都已在列表中');
+  if (entries.length === 0) showToast(t('toast.dropEmpty'));
+  else if (added === 0) showToast(t('toast.dropDup'));
 });
 
 // ---------------------------------------------------------------- 启动
 
 (async function init() {
+  // 先渲染语言 / 主题控件，避免首闪空控件
+  buildLangOptions();
+  buildThemeChips();
   try {
     const prefs = await invoke(internals, 'get_prefs');
     if (prefs) state.prefs = { ...state.prefs, ...prefs };
   } catch {
     /* 首次启动或 IPC 异常时用默认值 */
   }
+  // 主题非法值回落 teal
+  if (!THEME_IDS.includes(state.prefs.theme)) state.prefs.theme = 'teal';
+  // 语言：优先用户手动选择；否则跟随系统（检测结果不写回 prefs，保持跟随）
+  const lang =
+    state.prefs.language || detectLocale([navigator.language, ...(navigator.languages || [])]);
+  applyLocale(lang, { persist: false });
   applyPrefs();
   renderList();
   renderStats();
