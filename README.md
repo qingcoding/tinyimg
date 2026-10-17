@@ -76,11 +76,14 @@ GUI 与 CLI 共用同一压缩库（`tinyimg` crate），算法行为完全一�
 - **输出文件夹**：自选目录；未选择时输出到原文件同目录（文件名加 `-min`，**绝不覆盖原文件**）
 - **记忆上次打开位置**：导入目录、输出目录、输出格式选择持久化于
   `~/Library/Application Support/cn.tinyimg.desktop/prefs.json`，下次启动自动恢复
+- **多语言**：10 种语言（简体中文 / 繁體中文 / English / 日本語 / 한국어 / Français / Deutsch /
+  Español / Русский / Português），首次启动自动跟随系统语言，默认回落中文，可手动切换并记忆
+- **主题配色**：6 套一键切换（碧海 / 暗夜 / 紫罗兰 / 苍穹 / 蔷薇 / 森林），CSS 变量驱动，即时生效
 - 队列列表（原体积 / 压缩后 / 压缩率 / 状态）+ 统计面板（已节省、平均压缩率、进度）
-- 蓝绿清新界面，全中文；批量并行压缩，逐文件流式进度
+- 批量并行压缩，逐文件流式进度
 
 > 前端为原生 HTML/CSS/JS（`src-tauri/ui/`，无构建链），IPC 直连 Tauri internals；
-> 质量档位、前后对比、深浅主题等 PRD 其余需求见「路线图」。
+> 质量档位、前后对比等 PRD 其余需求见「路线图」。
 
 ## 压缩效果（实测）
 
@@ -187,15 +190,15 @@ tinyimg-pc/
 
 ```bash
 cargo test                                  # 库 + CLI：59 项（lib 19 + integration 21 + qa_semi_edge 19）
-cd src-tauri && cargo test --release        # GUI 逻辑：13 项（偏好 / 输出策略 / 压缩管线 / 目录收集）
-cd src-tauri && node tests/ui_logic.test.mjs  # 前端逻辑：9 项（Channel 乱序重排 / 事件监听 / 纯函数）
+cd src-tauri && cargo test --release        # GUI 逻辑：15 项（偏好 / 输出策略 / 压缩管线 / 目录收集）
+cd src-tauri && node tests/ui_logic.test.mjs  # 前端逻辑：15 项（Channel 乱序重排 / 事件监听 / 纯函数 / i18n 与主题）
 cargo build --release --no-default-features # 精简构建（无 WebP，~1.0 MB）
 ```
 
 覆盖：CRC32 标准向量、量化色数预算、透明槽位、半透明量化扩展（≤5% 索引 + tRNS
 半透明 alpha）/ 真彩回退（>5%）/ 近似数报告、JPEG 管线、
 WebP 有损/无损分流、输出命名策略（含 .webp 扩展名）、无收益跳过、
-损坏文件容错、目录扫描。
+损坏文件容错、目录扫描、prefs 序列化与向后兼容、locale 检测归一化与字典一致性。
 
 ## 路线图
 
@@ -203,7 +206,9 @@ WebP 有损/无损分流、输出命名策略（含 .webp 扩展名）、无收�
 - [x] **WebP 输出**：`--format webp`，照片有损 / 扁平图无损自动分流
 - [x] **M3 GUI 桌面壳（首批）**：Tauri 2 窗口 + 单文件/文件夹/拖拽导入 + 输出类型（默认 WebP）+ 输出目录 + 记忆上次位置 + 队列与统计
 - [x] **macOS 打包**：`tauri build` 产出 `图小小 TinyImg.app`（5.0 MB）+ 压缩 DMG（2.2 MB，含卷图标与 Applications 拖拽安装软链），ad-hoc 签名本机可直接打开
-- [ ] M3 GUI 体验完整：质量档位预设、保留元数据开关、深浅主题、前后对比、Toast 通知（见 `docs/PRD.md`）
+- [x] **多语言**：10 种语言，首次启动跟随系统语言（默认回落中文），手动选择记忆
+- [x] **主题配色**：6 套（碧海 / 暗夜 / 紫罗兰 / 苍穹 / 蔷薇 / 森林）CSS 变量驱动即时切换
+- [ ] M3 GUI 体验完整：质量档位预设、保留元数据开关、前后对比、Toast 通知（见 `docs/PRD.md`）
 - [ ] M2 画质守卫：SSIM 低于阈值自动提高色数重试（PRD 的"智能回退"完全体）
 - [ ] M4 WebP/AVIF 输入支持
 
