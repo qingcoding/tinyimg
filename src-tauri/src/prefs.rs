@@ -1,5 +1,5 @@
 //! 偏好持久化：记住上次打开位置（导入目录 / 输出目录）、输出格式、
-//! 界面语言与主题配色。
+//! 压缩程度、界面语言与主题配色。
 //!
 //! 存储于 `app_config_dir()/prefs.json`（macOS: `~/Library/Application
 //! Support/cn.tinyimg.desktop/`），原子写入（临时文件 + rename）防半写损坏。
@@ -23,6 +23,8 @@ pub struct Prefs {
     pub last_output_dir: Option<String>,
     /// 输出格式："auto"（默认，跟随输入）或 "webp"（一律转 WebP）
     pub output_format: String,
+    /// 压缩程度（0-100 滑条值）：0 = 最激进（体积优先），100 = 最细腻（画质优先，默认）
+    pub compress_level: u8,
     /// 界面语言（BCP-47 归一化后的 code，如 "zh-CN" / "en"）；None = 跟随系统语言
     pub language: Option<String>,
     /// 主题配色 id（teal / dark / violet / ocean / rose / forest）；None 时前端回落默认
@@ -35,6 +37,7 @@ impl Default for Prefs {
             last_input_dir: None,
             last_output_dir: None,
             output_format: "auto".to_string(),
+            compress_level: 100,
             language: None,
             theme: Some("teal".to_string()),
         }
@@ -106,6 +109,8 @@ mod tests {
         assert_eq!(p.output_format, "auto");
         assert!(p.last_input_dir.is_none());
         assert!(p.last_output_dir.is_none());
+        // 压缩程度默认 100（最细腻，等同 CLI high 档）
+        assert_eq!(p.compress_level, 100);
         // 语言 / 主题默认值：跟随系统 + teal
         assert!(p.language.is_none());
         assert_eq!(p.theme.as_deref(), Some("teal"));
@@ -140,6 +145,7 @@ mod tests {
             last_input_dir: Some("/Users/bruce/Pictures".into()),
             last_output_dir: Some("/Users/bruce/Desktop/out".into()),
             output_format: "auto".into(),
+            compress_level: 60,
             language: Some("en".into()),
             theme: Some("ocean".into()),
         };
@@ -147,10 +153,12 @@ mod tests {
         assert!(text.contains("lastInputDir"), "序列化应为 camelCase: {text}");
         assert!(text.contains("\"language\": \"en\""), "language 应为 camelCase: {text}");
         assert!(text.contains("\"theme\": \"ocean\""), "theme 应为 camelCase: {text}");
+        assert!(text.contains("\"compressLevel\": 60"), "compressLevel 应为 camelCase: {text}");
         let back = deserialize(&text).unwrap();
         assert_eq!(back.last_input_dir.as_deref(), Some("/Users/bruce/Pictures"));
         assert_eq!(back.last_output_dir.as_deref(), Some("/Users/bruce/Desktop/out"));
         assert_eq!(back.output_format(), OutputFormat::Auto);
+        assert_eq!(back.compress_level, 60, "压缩程度应 roundtrip 保留");
         assert_eq!(back.language.as_deref(), Some("en"));
         assert_eq!(back.theme.as_deref(), Some("ocean"));
     }
@@ -162,13 +170,25 @@ mod tests {
 
     #[test]
     fn deserialize_legacy_json_fills_language_theme_defaults() {
-        // 向后兼容：旧版偏好（无 language / theme 字段）反序列化后取默认值
+        // 向后兼容：旧版偏好（无 language / theme / compressLevel 字段）反序列化后取默认值
         let back = deserialize(r#"{"lastInputDir":"/a","lastOutputDir":"/b","outputFormat":"webp"}"#)
             .unwrap();
         assert_eq!(back.last_input_dir.as_deref(), Some("/a"));
         assert_eq!(back.output_format(), OutputFormat::WebP);
         assert!(back.language.is_none());
         assert_eq!(back.theme.as_deref(), Some("teal"));
+        // 无 compressLevel → 默认 100（最细腻），老用户行为不变
+        assert_eq!(back.compress_level, 100);
+    }
+
+    #[test]
+    fn deserialize_legacy_json_preserves_saved_level() {
+        // 老用户已存的压缩程度原样读入，不被默认值覆盖
+        let back = deserialize(
+            r#"{"lastInputDir":"/a","outputFormat":"auto","compressLevel":35}"#,
+        )
+        .unwrap();
+        assert_eq!(back.compress_level, 35);
     }
 
     #[test]

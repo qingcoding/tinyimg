@@ -665,35 +665,58 @@ th.col-size, th.col-ratio, th.col-actions { text-align: right; }
 .menu-item-check svg { width: 14px; height: 14px; display: block; }
 .menu-item.active .menu-item-check { opacity: 1; }
 
-/* 主题色块 */
-.theme-row { display: flex; flex-wrap: wrap; gap: 6px; }
-.theme-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: inherit;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--ink-soft);
-  background: var(--seg-bg);
-  border: 1.5px solid var(--line);
-  border-radius: 999px;
-  padding: 4px 10px 4px 6px;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s, transform 0.15s;
-}
-.theme-chip:hover { transform: translateY(-1px); border-color: var(--accent-glow); }
-.theme-chip.active {
-  color: var(--accent-deep);
-  border-color: var(--accent);
-  background: var(--card-solid);
-  box-shadow: 0 3px 10px var(--seg-shadow);
-}
-.theme-chip-dot {
-  width: 13px; height: 13px;
+/* 菜单项标签贴左、勾选贴右（圆点 + 标签 + 勾选的布局同样成立） */
+.menu-item-label { margin-right: auto; }
+/* 主题菜单的 accent 渐变小圆点 */
+.menu-item-dot {
+  width: 14px; height: 14px;
   border-radius: 50%;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
   flex: none;
+}
+
+/* 压缩程度滑条（细腻 ↔ 激进） */
+.level-row { display: flex; align-items: center; gap: 10px; }
+.level-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--seg-bg);
+  outline: none;
+  cursor: pointer;
+}
+.level-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--card-solid, #fff);
+  border: 2px solid var(--accent);
+  box-shadow: 0 1px 4px var(--seg-shadow);
+  cursor: grab;
+  transition: transform 0.12s;
+}
+.level-row input[type="range"]:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  transform: scale(1.12);
+}
+.level-value {
+  min-width: 30px;
+  text-align: right;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent-deep);
+  font-variant-numeric: tabular-nums;
+}
+.level-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 3px;
 }
 
 .dir-row { display: flex; align-items: center; gap: 8px; }

@@ -88,6 +88,19 @@ pub struct Options {
     pub output_format: OutputFormat,
 }
 
+/// 将 GUI 的"压缩程度"滑条值（0-100）映射为压缩参数。
+///
+/// 线性插值于 CLI 三档之间：
+/// - 0 = 最激进（等同 low 档：64 色 / q72）——体积优先
+/// - 100 = 最细腻（等同 high 档：256 色 / q88）——画质优先，**GUI 默认**
+/// - 输入越界时 clamp 到 [0, 100]
+pub fn level_params(level: u8) -> (usize, u8) {
+    let level = level.min(100) as usize;
+    let colors = 64 + level * 192 / 100;
+    let quality = (72 + level * 16 / 100) as u8;
+    (colors, quality)
+}
+
 /// 压缩产物：字节流 + 人类可读的处理说明 + 图片信息
 pub struct Compressed {
     pub bytes: Vec<u8>,
@@ -304,4 +317,43 @@ fn is_supported_ext(path: &Path) -> bool {
             .as_deref(),
         Some("png") | Some("jpg") | Some("jpeg")
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn level_params_endpoints_match_cli_presets() {
+        // 0 = 最激进，等同 CLI low 档
+        assert_eq!(level_params(0), (64, 72));
+        // 100 = 最细腻，等同 CLI high 档（GUI 默认）
+        assert_eq!(level_params(100), (256, 88));
+    }
+
+    #[test]
+    fn level_params_monotonic_increasing() {
+        let mut prev = level_params(0);
+        for level in (10..=100).step_by(10) {
+            let cur = level_params(level);
+            assert!(cur.0 >= prev.0, "色数应随档位单调不减: {:?}", cur);
+            assert!(cur.1 >= prev.1, "质量应随档位单调不减: {:?}", cur);
+            prev = cur;
+        }
+    }
+
+    #[test]
+    fn level_params_clamps_out_of_range() {
+        // u8 上限 255，越界一律按 100（最细腻）处理
+        assert_eq!(level_params(200), (256, 88));
+        assert_eq!(level_params(255), (256, 88));
+    }
+
+    #[test]
+    fn level_params_midpoint_between_presets() {
+        // 50 应落在 low 与 high 正中附近
+        let (colors, quality) = level_params(50);
+        assert_eq!(colors, 160);
+        assert_eq!(quality, 80);
+    }
 }

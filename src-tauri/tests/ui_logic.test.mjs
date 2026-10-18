@@ -218,6 +218,29 @@ test('THEME_IDS 恰好六套且非空', () => {
   }
 });
 
+test('主题菜单与压缩程度滑条的 i18n key 全覆盖', () => {
+  // 新 key：顶栏主题菜单 + 压缩程度滑条（含左右端点标签）
+  const newKeys = ['menu.theme', 'field.level', 'field.levelHint', 'level.strong', 'level.fine'];
+  for (const { code } of LOCALES) {
+    for (const key of newKeys) {
+      const v = DICTS[code][key];
+      assert.ok(typeof v === 'string' && v.length > 0, `${code} 的 ${key} 应为非空译文`);
+    }
+    // 端点标签不得相同（否则用户分不清方向）
+    assert.notEqual(DICTS[code]['level.strong'], DICTS[code]['level.fine'], `${code} 的 level 端点标签应可区分`);
+  }
+  // 旧侧栏主题字段 key 已随功能迁移移除
+  for (const { code } of LOCALES) {
+    assert.ok(!('field.theme' in DICTS[code]), `${code} 不应再保留已迁移的 field.theme`);
+    assert.ok(!('field.themeHint' in DICTS[code]), `${code} 不应再保留已迁移的 field.themeHint`);
+  }
+  // 英文译文抽验（防机翻/串台）
+  assert.equal(DICTS.en['menu.theme'], 'Theme');
+  assert.equal(DICTS.en['field.level'], 'Compression level');
+  assert.equal(DICTS.en['level.strong'], 'Aggressive');
+  assert.equal(DICTS.en['level.fine'], 'Fine');
+});
+
 test('LOCALES 至少 10 种、code 唯一且均有字典', () => {
   assert.ok(LOCALES.length >= 10, '至少 10 种语言');
   const codes = new Set();

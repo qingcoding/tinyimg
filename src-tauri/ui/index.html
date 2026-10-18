@@ -30,6 +30,16 @@
       </div>
       <div class="topbar-right">
         <div class="topbar-hint" id="engineInfo" data-i18n="engine.ready">压缩引擎就绪</div>
+        <!-- 主题菜单：衣服图标入口（原侧栏主题字段已移至此处） -->
+        <div class="menu-wrap" id="themeMenuWrap">
+          <button class="icon-btn" id="btnTheme" type="button" data-i18n-title="menu.theme" aria-haspopup="true" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/></svg>
+          </button>
+          <div class="menu-dropdown" id="themeMenu" role="menu" hidden>
+            <div class="menu-title" data-i18n="menu.theme">主题颜色</div>
+            <div class="menu-list" id="themeMenuList"></div>
+          </div>
+        </div>
         <!-- 顶部设置菜单：语言切换（原侧栏语言字段已移至此处） -->
         <div class="menu-wrap" id="settingsMenuWrap">
           <button class="icon-btn" id="btnSettings" type="button" data-i18n-title="menu.settings" aria-haspopup="true" aria-expanded="false">
@@ -140,9 +150,16 @@
           </div>
 
           <div class="field">
-            <label class="field-label" data-i18n="field.theme">主题颜色</label>
-            <div class="theme-row" id="themeRow"></div>
-            <p class="field-hint" data-i18n="field.themeHint">点击色块切换配色，即时生效</p>
+            <label class="field-label" for="levelSlider" data-i18n="field.level">压缩程度</label>
+            <div class="level-row">
+              <input type="range" id="levelSlider" min="0" max="100" step="1" value="100" />
+              <span class="level-value" id="levelValue">100</span>
+            </div>
+            <div class="level-scale" aria-hidden="true">
+              <span data-i18n="level.strong">激进</span>
+              <span data-i18n="level.fine">细腻</span>
+            </div>
+            <p class="field-hint" data-i18n="field.levelHint">拖动控制细腻程度：越靠右画质越好、体积略大；越靠左压缩越狠、体积更小</p>
           </div>
         </div>
       </aside>

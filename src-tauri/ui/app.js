@@ -33,6 +33,7 @@ const state = {
     lastInputDir: null,
     lastOutputDir: null,
     outputFormat: 'auto',
+    compressLevel: 100,
     language: null,
     theme: 'teal',
   },
@@ -58,7 +59,11 @@ const btnRun = $('btnRun');
 const btnClear = $('btnClear');
 const outputDirPath = $('outputDirPath');
 const formatSeg = $('formatSeg');
-const themeRow = $('themeRow');
+const levelSlider = $('levelSlider');
+const levelValue = $('levelValue');
+const btnTheme = $('btnTheme');
+const themeMenu = $('themeMenu');
+const themeMenuList = $('themeMenuList');
 const btnSettings = $('btnSettings');
 const settingsMenu = $('settingsMenu');
 const langMenuList = $('langMenuList');
@@ -191,28 +196,44 @@ function applyPrefs() {
   formatSeg.querySelectorAll('.seg').forEach((b) =>
     b.classList.toggle('active', b.dataset.format === state.prefs.outputFormat)
   );
+  // 压缩程度滑条
+  levelSlider.value = String(state.prefs.compressLevel);
+  levelValue.textContent = String(state.prefs.compressLevel);
   // 输出目录展示
   renderOutputDir();
-  // applyI18n 内部会重建语言菜单勾选态与主题色块
+  // applyI18n 内部会重建语言菜单勾选态与主题菜单勾选态
   applyI18n();
   applyTheme();
 }
 
-// ---------------------------------------------------------------- 顶部设置菜单
+// ---------------------------------------------------------------- 顶部菜单（设置 / 主题）
+
+/** 关闭全部顶部菜单（设置与主题互斥，同刻只开一个） */
+function closeAllMenus() {
+  settingsMenu.hidden = true;
+  btnSettings.setAttribute('aria-expanded', 'false');
+  themeMenu.hidden = true;
+  btnTheme.setAttribute('aria-expanded', 'false');
+}
 
 /** 打开 / 关闭设置菜单（语言项） */
 function toggleSettingsMenu() {
-  settingsMenu.hidden ? openSettingsMenu() : closeSettingsMenu();
+  const willOpen = settingsMenu.hidden;
+  closeAllMenus();
+  if (willOpen) {
+    settingsMenu.hidden = false;
+    btnSettings.setAttribute('aria-expanded', 'true');
+  }
 }
 
-function openSettingsMenu() {
-  settingsMenu.hidden = false;
-  btnSettings.setAttribute('aria-expanded', 'true');
-}
-
-function closeSettingsMenu() {
-  settingsMenu.hidden = true;
-  btnSettings.setAttribute('aria-expanded', 'false');
+/** 打开 / 关闭主题菜单（配色项） */
+function toggleThemeMenu() {
+  const willOpen = themeMenu.hidden;
+  closeAllMenus();
+  if (willOpen) {
+    themeMenu.hidden = false;
+    btnTheme.setAttribute('aria-expanded', 'true');
+  }
 }
 
 // ---------------------------------------------------------------- 语言与主题
@@ -246,30 +267,41 @@ function buildLangMenu() {
   }
 }
 
-/** 生成主题色块（内联该主题 accent 双色渐变小圆点 + 主题名） */
-function buildThemeChips() {
-  themeRow.innerHTML = '';
+/** 生成主题菜单项（内联该主题 accent 双色渐变小圆点 + 主题名 + 当前项勾选），语言切换后重建 */
+function buildThemeMenu() {
+  themeMenuList.innerHTML = '';
   for (const id of THEME_IDS) {
     const [a1, a2] = THEME_ACCENTS[id] || ['#0d9488', '#0891b2'];
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'theme-chip';
-    chip.dataset.themeId = id;
-    chip.title = t(`theme.${id}`);
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'menu-item';
+    item.dataset.themeId = id;
+    item.setAttribute('role', 'menuitem');
+    if (id === state.prefs.theme) {
+      item.classList.add('active');
+      item.setAttribute('aria-current', 'true');
+    }
     const dot = document.createElement('span');
-    dot.className = 'theme-chip-dot';
+    dot.className = 'menu-item-dot';
     dot.style.background = `linear-gradient(135deg, ${a1}, ${a2})`;
     const label = document.createElement('span');
+    label.className = 'menu-item-label';
     label.textContent = t(`theme.${id}`);
-    chip.append(dot, label);
-    themeRow.appendChild(chip);
+    const check = document.createElement('span');
+    check.className = 'menu-item-check';
+    check.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    item.append(dot, label, check);
+    item.addEventListener('click', () => {
+      if (!THEME_IDS.includes(id)) return;
+      state.prefs.theme = id;
+      savePrefs();
+      applyTheme();
+      buildThemeMenu();
+      closeAllMenus();
+    });
+    themeMenuList.appendChild(item);
   }
-}
-
-function syncThemeChips() {
-  themeRow.querySelectorAll('.theme-chip').forEach((chip) =>
-    chip.classList.toggle('active', chip.dataset.themeId === state.prefs.theme)
-  );
 }
 
 /** 应用静态文案（data-i18n / data-i18n-title）、html lang、标题与控件选中态 */
@@ -282,8 +314,7 @@ function applyI18n() {
   });
   document.documentElement.lang = translator.locale;
   document.title = t('app.title');
-  buildThemeChips();
-  syncThemeChips();
+  buildThemeMenu();
   buildLangMenu();
 }
 
@@ -369,6 +400,7 @@ async function runCompress() {
       paths,
       outputDir: state.prefs.lastOutputDir || null,
       format: state.prefs.outputFormat,
+      level: state.prefs.compressLevel,
       onProgress: channel,
     });
     // Channel 已流式更新，返回值做兜底对齐（极端丢包场景）
@@ -442,25 +474,26 @@ btnSettings.addEventListener('click', (ev) => {
   toggleSettingsMenu();
 });
 
-// 点击菜单外部 / 按 Esc 关闭设置菜单
-document.addEventListener('click', (ev) => {
-  if (settingsMenu.hidden) return;
-  if (!ev.target.closest('.menu-wrap')) closeSettingsMenu();
-});
-document.addEventListener('keydown', (ev) => {
-  if (ev.key === 'Escape' && !settingsMenu.hidden) closeSettingsMenu();
+btnTheme.addEventListener('click', (ev) => {
+  ev.stopPropagation();
+  toggleThemeMenu();
 });
 
-themeRow.addEventListener('click', (ev) => {
-  const chip = ev.target.closest('.theme-chip');
-  if (!chip) return;
-  const id = chip.dataset.themeId;
-  if (!THEME_IDS.includes(id)) return;
-  state.prefs.theme = id;
-  savePrefs();
-  applyTheme();
-  applyI18n();
+// 点击菜单外部 / 按 Esc 关闭全部顶部菜单
+document.addEventListener('click', (ev) => {
+  if (settingsMenu.hidden && themeMenu.hidden) return;
+  if (!ev.target.closest('.menu-wrap')) closeAllMenus();
 });
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape') closeAllMenus();
+});
+
+// 压缩程度滑条：input 实时刷新数值，change（松手）时持久化
+levelSlider.addEventListener('input', () => {
+  levelValue.textContent = levelSlider.value;
+  state.prefs.compressLevel = Number(levelSlider.value);
+});
+levelSlider.addEventListener('change', savePrefs);
 
 btnRun.addEventListener('click', runCompress);
 
@@ -513,8 +546,8 @@ onTauriEvent(internals, 'tauri://drag-drop', async (evt) => {
 // ---------------------------------------------------------------- 启动
 
 (async function init() {
-  // 先渲染主题控件，避免首闪空控件
-  buildThemeChips();
+  // 先渲染主题菜单，避免首闪空控件
+  buildThemeMenu();
   try {
     const prefs = await invoke(internals, 'get_prefs');
     if (prefs) state.prefs = { ...state.prefs, ...prefs };
@@ -523,6 +556,9 @@ onTauriEvent(internals, 'tauri://drag-drop', async (evt) => {
   }
   // 主题非法值回落 teal
   if (!THEME_IDS.includes(state.prefs.theme)) state.prefs.theme = 'teal';
+  // 压缩程度非法值回落 100（旧版 prefs 无此字段时 serde 填默认，前端兜底钳制）
+  const level = Number(state.prefs.compressLevel);
+  state.prefs.compressLevel = Number.isFinite(level) ? Math.min(100, Math.max(0, Math.round(level))) : 100;
   // 语言：优先用户手动选择；否则跟随系统（检测结果不写回 prefs，保持跟随）
   const lang =
     state.prefs.language || detectLocale([navigator.language, ...(navigator.languages || [])]);

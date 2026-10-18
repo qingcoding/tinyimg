@@ -171,17 +171,20 @@ pub fn collect_paths(paths: Vec<String>) -> Vec<FileEntry> {
 
 // ---------------------------------------------------------------- 压缩
 
-/// 质量档位：与 CLI 默认档一致（256 色 / q88 / 无 dither）
-fn default_options(format: &str) -> Options {
+/// 质量档位：由"压缩程度"滑条值（0-100，默认 100）经 level_params 映射。
+/// 100 = 256 色 / q88（与 CLI high 档一致，GUI 默认行为）。
+/// dither 暂不暴露给 GUI（保持默认关闭，误差扩散收益有限且拖慢批量）。
+fn default_options(format: &str, level: u8) -> Options {
     let output_format = match format {
         "auto" | "a" | "自动" => OutputFormat::Auto,
         "webp" => OutputFormat::WebP,
         // 无法识别 → Auto（与前端默认一致）
         _ => OutputFormat::Auto,
     };
+    let (colors, quality) = compress::level_params(level);
     Options {
-        colors: 256,
-        quality: 88,
+        colors,
+        quality,
         dither: false,
         output_format,
     }
@@ -256,15 +259,17 @@ fn compress_one(input: &Path, output_dir: &Option<String>, opts: &Options) -> Fi
     }
 }
 
-/// 批量压缩：并行处理，每完成一个文件经 `on_progress` Channel 推送一条结果
+/// 批量压缩：并行处理，每完成一个文件经 `on_progress` Channel 推送一条结果。
+/// `level` 为压缩程度（0-100，前端滑条值；越界在 level_params 内 clamp）。
 #[tauri::command]
 pub async fn compress_batch(
     paths: Vec<String>,
     output_dir: Option<String>,
     format: String,
+    level: u8,
     on_progress: Channel<FileResult>,
 ) -> Vec<FileResult> {
-    let opts = default_options(&format);
+    let opts = default_options(&format, level);
     let pathbufs: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
 
     tauri::async_runtime::spawn_blocking(move || {
@@ -333,12 +338,27 @@ mod tests {
 
     #[test]
     fn default_options_format_parsing() {
-        assert_eq!(default_options("webp").output_format, OutputFormat::WebP);
-        assert_eq!(default_options("auto").output_format, OutputFormat::Auto);
+        assert_eq!(default_options("webp", 100).output_format, OutputFormat::WebP);
+        assert_eq!(default_options("auto", 100).output_format, OutputFormat::Auto);
         // 无法识别 → Auto（与前端默认一致）
-        assert_eq!(default_options("png").output_format, OutputFormat::Auto);
-        let o = default_options("webp");
+        assert_eq!(default_options("png", 100).output_format, OutputFormat::Auto);
+        let o = default_options("webp", 100);
         assert_eq!((o.colors, o.quality, o.dither), (256, 88, false));
+    }
+
+    #[test]
+    fn default_options_level_maps_to_params() {
+        // 滑条两端：0 = CLI low 档参数，100 = CLI high 档参数（GUI 默认）
+        let low = default_options("auto", 0);
+        assert_eq!((low.colors, low.quality), (64, 72));
+        let high = default_options("auto", 100);
+        assert_eq!((high.colors, high.quality), (256, 88));
+        // 越界 clamp 到 100
+        let over = default_options("auto", 200);
+        assert_eq!((over.colors, over.quality), (256, 88));
+        // 中间值单调介于两端之间
+        let mid = default_options("auto", 50);
+        assert_eq!((mid.colors, mid.quality), (160, 80));
     }
 
     #[test]
@@ -380,7 +400,7 @@ mod tests {
         let input = samples_dir().join("logo.png");
         let out_dir = std::env::temp_dir().join("tinyimg-gui-test-out");
         let _ = std::fs::remove_dir_all(&out_dir);
-        let opts = default_options("webp");
+        let opts = default_options("webp", 100);
 
         let r = compress_one(&input, &Some(out_dir.to_string_lossy().to_string()), &opts);
 
@@ -403,7 +423,7 @@ mod tests {
         std::fs::write(&input, std::fs::read(samples_dir().join("photo.png")).unwrap()).unwrap();
         let original_bytes = std::fs::read(&input).unwrap();
 
-        let opts = default_options("webp");
+        let opts = default_options("webp", 100);
         let r = compress_one(&input, &Some(staging.to_string_lossy().to_string()), &opts);
 
         assert_eq!(r.status, "done");
@@ -425,7 +445,7 @@ mod tests {
         let input = staging.join("notes.txt");
         std::fs::write(&input, b"hello").unwrap();
 
-        let r = compress_one(&input, &None, &default_options("webp"));
+        let r = compress_one(&input, &None, &default_options("webp", 100));
         assert_eq!(r.status, "failed");
         assert!(r.detail.contains("无法识别图片格式"), "错误信息应可读: {}", r.detail);
         let _ = std::fs::remove_dir_all(&staging);
