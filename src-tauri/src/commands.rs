@@ -175,7 +175,9 @@ pub fn collect_paths(paths: Vec<String>) -> Vec<FileEntry> {
 fn default_options(format: &str) -> Options {
     let output_format = match format {
         "auto" | "a" | "自动" => OutputFormat::Auto,
-        _ => OutputFormat::WebP,
+        "webp" => OutputFormat::WebP,
+        // 无法识别 → Auto（与前端默认一致）
+        _ => OutputFormat::Auto,
     };
     Options {
         colors: 256,
@@ -333,8 +335,8 @@ mod tests {
     fn default_options_format_parsing() {
         assert_eq!(default_options("webp").output_format, OutputFormat::WebP);
         assert_eq!(default_options("auto").output_format, OutputFormat::Auto);
-        // 无法识别 → WebP（与前端默认一致）
-        assert_eq!(default_options("png").output_format, OutputFormat::WebP);
+        // 无法识别 → Auto（与前端默认一致）
+        assert_eq!(default_options("png").output_format, OutputFormat::Auto);
         let o = default_options("webp");
         assert_eq!((o.colors, o.quality, o.dither), (256, 88, false));
     }

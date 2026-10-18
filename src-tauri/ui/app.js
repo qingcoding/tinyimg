@@ -32,7 +32,7 @@ const state = {
   prefs: {
     lastInputDir: null,
     lastOutputDir: null,
-    outputFormat: 'webp',
+    outputFormat: 'auto',
     language: null,
     theme: 'teal',
   },

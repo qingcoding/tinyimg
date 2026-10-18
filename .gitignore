@@ -3,3 +3,6 @@
 Cargo.lock.bak
 *.min.png
 *.min.jpg
+
+# macOS 系统文件
+.DS_Store

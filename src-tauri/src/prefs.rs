@@ -21,7 +21,7 @@ pub struct Prefs {
     pub last_input_dir: Option<String>,
     /// 上次选择的输出目录
     pub last_output_dir: Option<String>,
-    /// 输出格式："webp"（默认）或 "auto"（跟随输入）
+    /// 输出格式："auto"（默认，跟随输入）或 "webp"（一律转 WebP）
     pub output_format: String,
     /// 界面语言（BCP-47 归一化后的 code，如 "zh-CN" / "en"）；None = 跟随系统语言
     pub language: Option<String>,
@@ -34,7 +34,7 @@ impl Default for Prefs {
         Self {
             last_input_dir: None,
             last_output_dir: None,
-            output_format: "webp".to_string(),
+            output_format: "auto".to_string(),
             language: None,
             theme: Some("teal".to_string()),
         }
@@ -42,11 +42,13 @@ impl Default for Prefs {
 }
 
 impl Prefs {
-    /// 解析输出格式；无法识别时回落 WebP（默认）
+    /// 解析输出格式；显式 "webp" 保持 WebP（老用户 prefs.json 兼容），
+    /// 无法识别时回落 Auto（默认）
     pub fn output_format(&self) -> OutputFormat {
         match self.output_format.as_str() {
             "auto" | "a" | "自动" => OutputFormat::Auto,
-            _ => OutputFormat::WebP,
+            "webp" => OutputFormat::WebP,
+            _ => OutputFormat::Auto,
         }
     }
 }
@@ -99,15 +101,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_prefs_is_webp_and_empty() {
+    fn default_prefs_is_auto_and_empty() {
         let p = Prefs::default();
-        assert_eq!(p.output_format, "webp");
+        assert_eq!(p.output_format, "auto");
         assert!(p.last_input_dir.is_none());
         assert!(p.last_output_dir.is_none());
         // 语言 / 主题默认值：跟随系统 + teal
         assert!(p.language.is_none());
         assert_eq!(p.theme.as_deref(), Some("teal"));
-        assert_eq!(p.output_format(), OutputFormat::WebP);
+        assert_eq!(p.output_format(), OutputFormat::Auto);
     }
 
     #[test]
@@ -120,10 +122,15 @@ mod tests {
             Prefs { output_format: "自动".into(), ..Default::default() }.output_format(),
             OutputFormat::Auto
         );
-        // 无法识别 → 回落 WebP（默认）
+        // 显式 "webp" 保持 WebP（向后兼容老用户 prefs.json）
+        assert_eq!(
+            Prefs { output_format: "webp".into(), ..Default::default() }.output_format(),
+            OutputFormat::WebP
+        );
+        // 无法识别 → 回落 Auto（默认）
         assert_eq!(
             Prefs { output_format: "png".into(), ..Default::default() }.output_format(),
-            OutputFormat::WebP
+            OutputFormat::Auto
         );
     }
 
