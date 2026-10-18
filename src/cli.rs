@@ -6,12 +6,12 @@ use clap::Parser;
 
 use crate::compress::{Options, OutputFormat};
 
-/// 图小小 TinyImg — 本地图片压缩工具（TinyPNG 核心算法的 Rust 实现）
+/// TinyImg — 本地图片压缩工具（TinyPNG 核心算法的 Rust 实现）
 #[derive(Parser, Debug)]
 #[command(
     name = "tinyimg",
     version,
-    about = "图小小 TinyImg — 本地批量图片压缩工具（PNG 量化 + JPEG 重编码 + WebP 输出）",
+    about = "TinyImg — 本地批量图片压缩工具（PNG 量化 + JPEG 重编码 + WebP 输出）",
     after_help = "示例:\n  tinyimg photo.png                  # 压缩单张，输出 photo-min.png\n  tinyimg ./assets -o ./out          # 压缩目录（递归），输出到 out/\n  tinyimg *.png --preset low         # 低档位，体积优先\n  tinyimg a.png --colors 64 --dither # 自定义 64 色 + 误差扩散\n  tinyimg ./assets --format webp     # 一律输出 WebP（有损）"
 )]
 pub struct Args {

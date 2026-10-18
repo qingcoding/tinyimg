@@ -1,4 +1,4 @@
-// 图小小 TinyImg — 多语言（i18n）
+// TinyImg — 多语言（i18n）
 //
 // 纯 ESM 模块：无 DOM / IPC 依赖，可被 Node 测试直接 import，
 // 也被 app.js 用于运行时切换语言。
@@ -98,7 +98,7 @@ export function detectLocale(systemLangs) {
 /** 各语言字典：key 全集与 zh-CN 完全一致（防漏翻，测试把关） */
 export const DICTS = {
   'zh-CN': {
-    'app.title': '图小小 TinyImg',
+    'app.title': 'TinyImg',
     'app.tagline': '本地压缩 · 视觉无损 · 零上传',
     'engine.ready': '压缩引擎就绪',
     'drop.title': '拖入图片或文件夹到这里',
@@ -160,7 +160,7 @@ export const DICTS = {
   },
 
   'zh-TW': {
-    'app.title': '圖小小 TinyImg',
+    'app.title': 'TinyImg',
     'app.tagline': '本機壓縮 · 視覺無損 · 零上傳',
     'engine.ready': '壓縮引擎就緒',
     'drop.title': '拖入圖片或資料夾到這裡',

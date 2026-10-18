@@ -1,4 +1,4 @@
-# 图小小 TinyImg
+# TinyImg
 
 > 对标 [TinyPNG](https://tinypng.com/) 的**本地**图片批量压缩工具。
 > TinyPNG 核心算法（量化 + zopfli + 元数据剥离）的纯 Rust 复刻。
@@ -37,7 +37,7 @@ cargo build --release
 ## 输出示例
 
 ```
-图小小 TinyImg v0.1.0 — 本地图片压缩
+TinyImg v0.1.0 — 本地图片压缩
 档位: 256 色 / 有损 q88 · 输出: WebP（扁平图自动无损） · 共 5 个文件
 
   ✓ photo.jpg
@@ -62,7 +62,7 @@ cargo build --release          # 产物：src-tauri/target/release/tinyimg-gui
 ./target/release/tinyimg-gui   # 直接运行（前端资源已内嵌，无需 dev server）
 
 # 打包为 macOS 应用（.app + .dmg）
-npx @tauri-apps/cli@2 build    # 产物：target/release/bundle/macos/图小小 TinyImg.app 及 bundle/dmg/ 下同名 .dmg
+npx @tauri-apps/cli@2 build    # 产物：target/release/bundle/macos/TinyImg.app 及 bundle/dmg/ 下同名 .dmg
 ```
 
 > 沙箱/无 GUI 权限环境（如 CI、WorkBuddy 沙箱）需加 `CI=true` 跳过 Finder 美化脚本，
@@ -205,7 +205,7 @@ WebP 有损/无损分流、输出命名策略（含 .webp 扩展名）、无收�
 - [x] **M1 CLI 核心**：PNG 量化 + JPEG 重编码 + zopfli + 元数据剥离
 - [x] **WebP 输出**：`--format webp`，照片有损 / 扁平图无损自动分流
 - [x] **M3 GUI 桌面壳（首批）**：Tauri 2 窗口 + 单文件/文件夹/拖拽导入 + 输出类型（默认跟随输入）+ 输出目录 + 记忆上次位置 + 队列与统计
-- [x] **macOS 打包**：`tauri build` 产出 `图小小 TinyImg.app`（5.0 MB）+ 压缩 DMG（2.2 MB，含卷图标与 Applications 拖拽安装软链），ad-hoc 签名本机可直接打开
+- [x] **macOS 打包**：`tauri build` 产出 `TinyImg.app`（5.0 MB）+ 压缩 DMG（2.2 MB，含卷图标与 Applications 拖拽安装软链），ad-hoc 签名本机可直接打开
 - [x] **多语言**：10 种语言，首次启动跟随系统语言（默认回落中文），手动选择记忆
 - [x] **主题配色**：6 套（碧海 / 暗夜 / 紫罗兰 / 苍穹 / 蔷薇 / 森林）CSS 变量驱动即时切换
 - [ ] M3 GUI 体验完整：质量档位预设、保留元数据开关、前后对比、Toast 通知（见 `docs/PRD.md`）

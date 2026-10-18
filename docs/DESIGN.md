@@ -1,4 +1,4 @@
-# TinyPNG 压缩原理分析 & 图小小 TinyImg 设计文档
+# TinyPNG 压缩原理分析 & TinyImg 设计文档
 
 > 本文档回答两个问题：TinyPNG 为什么能把 PNG 压掉 60-90% 而肉眼几乎无差别？
 > 以及本工具如何用 Rust 复刻这条管线。

@@ -1,4 +1,4 @@
-//! 图小小 TinyImg — CLI 入口
+//! TinyImg — CLI 入口
 //!
 //! 流程：解析参数 → 收集文件 → rayon 并行压缩 → 逐行报告 + 汇总统计
 
@@ -30,7 +30,7 @@ fn main() {
         std::process::exit(1);
     }
 
-    println!("{}", bold("图小小 TinyImg v0.1.0 — 本地图片压缩"));
+    println!("{}", bold("TinyImg v0.1.0 — 本地图片压缩"));
     let format_desc = match args.format.to_lowercase().as_str() {
         "webp" | "w" => "WebP（扁平图自动无损）",
         _ => "auto（跟随输入）",

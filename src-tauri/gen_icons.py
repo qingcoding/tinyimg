@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""图小小 TinyImg 应用图标生成：teal 渐变圆角方 + 白色压缩箭头，导出 Tauri 全套图标。"""
+"""TinyImg 应用图标生成：teal 渐变圆角方 + 白色压缩箭头，导出 Tauri 全套图标。"""
 import os
 import subprocess
 from PIL import Image, ImageDraw

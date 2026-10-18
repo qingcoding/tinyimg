@@ -2,7 +2,7 @@
 name = "tinyimg-gui"
 version = "0.1.0"
 edition = "2021"
-description = "图小小 TinyImg — 本地图片压缩工具桌面端（Tauri 2）"
+description = "TinyImg — 本地图片压缩工具桌面端（Tauri 2）"
 license = "MIT"
 
 [lib]

@@ -2,7 +2,7 @@
 name = "tinyimg"
 version = "0.1.0"
 edition = "2021"
-description = "图小小 TinyImg — 轻量本地图片压缩工具（TinyPNG 核心算法的 Rust CLI 实现）"
+description = "TinyImg — 轻量本地图片压缩工具（TinyPNG 核心算法的 Rust CLI 实现）"
 license = "MIT"
 
 [dependencies]

@@ -17,5 +17,5 @@ fn main() {
             tinyimg_gui::commands::copy_image,
         ])
         .run(tauri::generate_context!())
-        .expect("运行图小小 TinyImg 失败");
+        .expect("运行 TinyImg 失败");
 }
