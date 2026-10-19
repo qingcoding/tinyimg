@@ -48,6 +48,8 @@ pub struct FileResult {
     pub width: u32,
     pub height: u32,
     pub out_format: String,
+    /// 单文件处理耗时（毫秒），前端用于"处理时间"列展示
+    pub elapsed_ms: u64,
 }
 
 fn fp_to_string(fp: &FilePath) -> Option<String> {
@@ -173,6 +175,7 @@ pub fn collect_paths(paths: Vec<String>) -> Vec<FileEntry> {
 
 /// 质量档位：由"压缩程度"滑条值（0-100，默认 100）经 level_params 映射。
 /// 100 = 256 色 / q88（与 CLI high 档一致，GUI 默认行为）。
+/// 滑条 = 0 时启用极致档（Zopfli 穷举压缩），其余档位走 flate2 快速 zlib。
 /// dither 暂不暴露给 GUI（保持默认关闭，误差扩散收益有限且拖慢批量）。
 fn default_options(format: &str, level: u8) -> Options {
     let output_format = match format {
@@ -187,6 +190,7 @@ fn default_options(format: &str, level: u8) -> Options {
         quality,
         dither: false,
         output_format,
+        extreme: level == 0,
     }
 }
 
@@ -208,6 +212,7 @@ fn compress_one(input: &Path, output_dir: &Option<String>, opts: &Options) -> Fi
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
     let (out_dir, overwrite) = resolve_output(input, output_dir);
+    let start = std::time::Instant::now();
 
     let fail = |status: &str, detail: String, original: u64| FileResult {
         name: name.clone(),
@@ -221,6 +226,7 @@ fn compress_one(input: &Path, output_dir: &Option<String>, opts: &Options) -> Fi
         width: 0,
         height: 0,
         out_format: String::new(),
+        elapsed_ms: start.elapsed().as_millis() as u64,
     };
 
     match compress::process_file(input, out_dir.as_deref(), overwrite, opts) {
@@ -247,6 +253,7 @@ fn compress_one(input: &Path, output_dir: &Option<String>, opts: &Options) -> Fi
             width: info.width,
             height: info.height,
             out_format: info.out_format.to_string(),
+            elapsed_ms: start.elapsed().as_millis() as u64,
         },
         Outcome::Skipped { reason, .. } => {
             let original = std::fs::metadata(input).map(|m| m.len()).unwrap_or(0);
@@ -359,6 +366,16 @@ mod tests {
         // 中间值单调介于两端之间
         let mid = default_options("auto", 50);
         assert_eq!((mid.colors, mid.quality), (160, 80));
+    }
+
+    #[test]
+    fn default_options_extreme_only_at_level_zero() {
+        // 极致档（Zopfli）仅由滑条 = 0 触发；其余档位走 flate2 快速 zlib
+        assert!(default_options("auto", 0).extreme, "level 0 应启用极致档");
+        assert!(default_options("webp", 0).extreme, "webp + level 0 同样极致");
+        assert!(!default_options("auto", 1).extreme, "level 1 不应极致");
+        assert!(!default_options("auto", 100).extreme, "level 100 不应极致（GUI 默认）");
+        assert!(!default_options("auto", 200).extreme, "越界 clamp 后也不应极致");
     }
 
     #[test]

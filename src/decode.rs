@@ -185,6 +185,7 @@ mod tests {
             quality: 88,
             dither: false,
             output_format: OutputFormat::WebP,
+            extreme: false,
         };
         let compressed = compress::compress_bytes(&png, &opts).expect("压缩应成功");
         assert!(is_webp(&compressed.bytes), "产物应为 WebP");

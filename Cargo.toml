@@ -15,6 +15,7 @@ png = "0.17"
 rayon = "1"
 walkdir = "2"
 zopfli = "0.6"
+flate2 = "1"
 zune-core = "0.4"
 zune-jpeg = "0.4"
 

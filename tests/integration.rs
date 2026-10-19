@@ -12,6 +12,7 @@ fn default_options() -> Options {
         quality: 88,
         dither: false,
         output_format: OutputFormat::Auto,
+        extreme: false,
     }
 }
 
@@ -21,6 +22,7 @@ fn webp_options() -> Options {
         quality: 88,
         dither: false,
         output_format: OutputFormat::WebP,
+        extreme: false,
     }
 }
 
@@ -125,6 +127,7 @@ fn png_quantization_respects_budget() {
         quality: 88,
         dither: false,
         output_format: OutputFormat::Auto,
+        extreme: false,
     };
     let compressed = compress_bytes(&original, &opts).expect("压缩失败");
 

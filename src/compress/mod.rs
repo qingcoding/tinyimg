@@ -86,14 +86,20 @@ pub struct Options {
     pub dither: bool,
     /// 输出格式
     pub output_format: OutputFormat,
+    /// 极致档：启用 Zopfli 穷举 DEFLATE（压缩率最高、极慢）。
+    /// 由 GUI「压缩程度」滑条 = 0 触发；其余档位走 flate2 快速 zlib。
+    pub extreme: bool,
 }
 
 /// 将 GUI 的"压缩程度"滑条值（0-100）映射为压缩参数。
 ///
 /// 线性插值于 CLI 三档之间：
-/// - 0 = 最激进（等同 low 档：64 色 / q72）——体积优先
+/// - 0 = 最激进（等同 low 档：64 色 / q72）——体积优先，**同时触发极致档（Zopfli）**
 /// - 100 = 最细腻（等同 high 档：256 色 / q88）——画质优先，**GUI 默认**
 /// - 输入越界时 clamp 到 [0, 100]
+///
+/// 注意：极致档（zopfli）仅由 `level == 0` 经 `default_options` 的 `extreme` 字段开启，
+/// 本函数只负责颜色/质量映射，不直接决定压缩器。
 pub fn level_params(level: u8) -> (usize, u8) {
     let level = level.min(100) as usize;
     let colors = 64 + level * 192 / 100;

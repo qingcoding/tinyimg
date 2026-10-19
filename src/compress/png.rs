@@ -75,19 +75,24 @@ pub fn compress_png(data: &[u8], opts: &Options) -> Result<Compressed> {
     );
 
     if q.fallback_truecolor {
-        let out = pngw::write_rgba_png(width, height, &rgba);
+        let out = pngw::write_rgba_png_ext(width, height, &rgba, opts.extreme);
         return Ok(Compressed {
             bytes: out,
-            detail: "RGBA 真彩 + zopfli（含半透明，未量化）".to_string(),
+            detail: if opts.extreme {
+                "RGBA 真彩 + Zopfli 极致压缩（含半透明，未量化）".to_string()
+            } else {
+                "RGBA 真彩 + 快速 zlib（含半透明，未量化）".to_string()
+            },
             info: image_info,
         });
     }
 
-    let out = pngw::write_indexed_png(width, height, &q.palette, &q.indices, q.transparent);
+    let out = pngw::write_indexed_png_ext(width, height, &q.palette, &q.indices, q.transparent, opts.extreme);
 
     let mut detail = format!(
-        "{} 色索引 + zopfli{}",
+        "{} 色索引 + {}{}",
         q.palette.len(),
+        if opts.extreme { "Zopfli 极致压缩" } else { "快速 zlib" },
         if opts.dither { " + 误差扩散" } else { "" }
     );
     if q.semi_approximated > 0 {

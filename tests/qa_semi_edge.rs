@@ -16,6 +16,7 @@ fn opts(colors: usize, dither: bool) -> Options {
         quality: 88,
         dither,
         output_format: OutputFormat::Auto,
+        extreme: false,
     }
 }
 

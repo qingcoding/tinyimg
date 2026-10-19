@@ -94,6 +94,7 @@ impl Args {
             quality,
             dither: self.dither,
             output_format,
+            extreme: false,
         })
     }
 }

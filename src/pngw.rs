@@ -4,7 +4,7 @@
 //! IDAT 数据流交给 zopfli（DEFLATE 的穷举优化实现，TinyPNG 同款压缩器）
 //! 做极限压缩。只写最小必要 chunk —— 元数据天然被剥离。
 
-use std::io::Cursor;
+use std::io::{Cursor, Write};
 
 const PNG_SIGNATURE: [u8; 8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
@@ -38,17 +38,29 @@ const fn build_crc_table() -> [u32; 256] {
     table
 }
 
-/// zopfli 压缩为完整 zlib 流（含 2 字节头 + adler32 尾，即合法 IDAT 负载）
-fn zlib_compress(data: &[u8]) -> std::io::Result<Vec<u8>> {
-    let mut out = Vec::new();
-    zopfli::compress(
-        &zopfli::Options::default(),
-        &zopfli::Format::Zlib,
-        Cursor::new(data),
-        data.len() as u64,
-        &mut out,
-    )?;
-    Ok(out)
+/// 压缩为完整 zlib 流（含 2 字节头 + adler32 尾，即合法 IDAT 负载）。
+///
+/// - `extreme = true`：走 zopfli 穷举 DEFLATE（TinyPNG 同款，压缩率最高、极慢）
+/// - `extreme = false`：走 flate2 的快速 zlib（Compression::best，CPU SIMD，远快于 zopfli）
+///
+/// 非极致档用 flate2 替代 zopfli 是本工具提速的关键：zopfli 为串行穷举，
+/// 在批量压缩场景下耗时占主导；PNG 量化与 JPEG/WebP 编码自身已是最优路径。
+fn zlib_compress(data: &[u8], extreme: bool) -> std::io::Result<Vec<u8>> {
+    if extreme {
+        let mut out = Vec::new();
+        zopfli::compress(
+            &zopfli::Options::default(),
+            &zopfli::Format::Zlib,
+            Cursor::new(data),
+            data.len() as u64,
+            &mut out,
+        )?;
+        Ok(out)
+    } else {
+        let mut enc = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::best());
+        enc.write_all(data)?;
+        enc.finish()
+    }
 }
 
 /// 追加一个 PNG chunk：length(4) + type(4) + data + crc32(type+data)(4)
@@ -87,6 +99,9 @@ fn add_filter_bytes(raw: &[u8], width_bytes: usize, height: usize) -> Vec<u8> {
 /// - `palette`: RGBA 调色板，≤ 256 项
 /// - `indices`: 每像素 1 字节的调色板索引
 /// - `transparent`: 若某调色板项为全透明，传其下标，写出 tRNS chunk
+///
+/// 默认走 Zopfli（极致压缩、向后兼容旧调用方与测试）。需要快速压缩时
+/// 使用 [`write_indexed_png_ext`] 并传 `extreme = false`。
 pub fn write_indexed_png(
     width: u32,
     height: u32,
@@ -94,11 +109,24 @@ pub fn write_indexed_png(
     indices: &[u8],
     transparent: Option<usize>,
 ) -> Vec<u8> {
+    write_indexed_png_ext(width, height, palette, indices, transparent, true)
+}
+
+/// 索引色 PNG 写出（可指定压缩器）。
+/// `extreme = true` 走 Zopfli（极致、极慢）；`false` 走 flate2 快速 zlib。
+pub fn write_indexed_png_ext(
+    width: u32,
+    height: u32,
+    palette: &[[u8; 4]],
+    indices: &[u8],
+    transparent: Option<usize>,
+    extreme: bool,
+) -> Vec<u8> {
     assert!(palette.len() <= 256, "调色板超过 256 色");
     assert_eq!(indices.len(), width as usize * height as usize);
 
     let raw = add_filter_bytes(indices, width as usize, height as usize);
-    let idat = zlib_compress(&raw).expect("zopfli 压缩失败");
+    let idat = zlib_compress(&raw, extreme).expect("zlib 压缩失败");
 
     let mut out = Vec::with_capacity(idat.len() + 1024);
     out.extend_from_slice(&PNG_SIGNATURE);
@@ -133,12 +161,21 @@ pub fn write_indexed_png(
     out
 }
 
-/// 写出 8-bit RGBA 真彩 PNG（半透明图片的保守回退路线，仍剥元数据 + zopfli）
+/// 写出 8-bit RGBA 真彩 PNG（半透明图片的保守回退路线，仍剥元数据）
+///
+/// 默认走 Zopfli（极致压缩、向后兼容旧调用方与测试）。需要快速压缩时
+/// 使用 [`write_rgba_png_ext`] 并传 `extreme = false`。
 pub fn write_rgba_png(width: u32, height: u32, rgba: &[u8]) -> Vec<u8> {
+    write_rgba_png_ext(width, height, rgba, true)
+}
+
+/// RGBA 真彩 PNG 写出（可指定压缩器）。
+/// `extreme = true` 走 Zopfli（极致、极慢）；`false` 走 flate2 快速 zlib。
+pub fn write_rgba_png_ext(width: u32, height: u32, rgba: &[u8], extreme: bool) -> Vec<u8> {
     assert_eq!(rgba.len(), width as usize * height as usize * 4);
 
     let raw = add_filter_bytes(rgba, width as usize * 4, height as usize);
-    let idat = zlib_compress(&raw).expect("zopfli 压缩失败");
+    let idat = zlib_compress(&raw, extreme).expect("zlib 压缩失败");
 
     let mut out = Vec::with_capacity(idat.len() + 64);
     out.extend_from_slice(&PNG_SIGNATURE);

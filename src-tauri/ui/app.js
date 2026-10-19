@@ -100,6 +100,7 @@ function renderList() {
       <td class="col-size" data-cell="comp">—</td>
       <td class="col-ratio" data-cell="ratio">—</td>
       <td class="col-status" data-cell="status"><span class="badge badge-wait">${t('status.wait')}</span></td>
+      <td class="col-time" data-cell="time">—</td>
       <td class="col-actions">
         <button class="row-icon" type="button" data-act="reveal" title="${esc(t('action.reveal'))}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
@@ -115,6 +116,15 @@ function renderList() {
   listCount.textContent = t('list.count', { n: entries.length });
 }
 
+function fmtElapsed(ms) {
+  if (!ms || ms <= 0) return '—';
+  if (ms < 1000) return `${ms} ms`;
+  const s = ms / 1000;
+  if (s < 60) return `${s.toFixed(s < 10 ? 1 : 0)} s`;
+  const m = Math.floor(s / 60);
+  return `${m}m ${Math.round(s % 60)}s`;
+}
+
 function applyResultToRow(entry) {
   const r = entry.result;
   const tr = rowEls.get(entry.path);
@@ -122,20 +132,24 @@ function applyResultToRow(entry) {
   const comp = tr.querySelector('[data-cell="comp"]');
   const ratio = tr.querySelector('[data-cell="ratio"]');
   const status = tr.querySelector('[data-cell="status"]');
+  const time = tr.querySelector('[data-cell="time"]');
   if (r.status === 'done') {
     comp.textContent = fmtSize(r.compressed);
     ratio.innerHTML = `<span class="ratio-good">${ratioText(r.ratio)}</span>`;
     status.innerHTML = `<span class="badge badge-done">${t('status.done')}</span>`;
+    time.textContent = fmtElapsed(r.elapsed_ms);
     tr.title = `${entry.path}\n${r.detail}${r.output ? `\n输出: ${r.output}` : ''}`;
   } else if (r.status === 'skipped') {
     comp.textContent = '—';
     ratio.innerHTML = '<span class="ratio-flat">—</span>';
     status.innerHTML = `<span class="badge badge-skip">${t('status.skip')}</span>`;
+    time.textContent = '—';
     tr.title = `${entry.path}\n${r.detail}`;
   } else {
     comp.textContent = '—';
     ratio.innerHTML = '<span class="ratio-flat">—</span>';
     status.innerHTML = `<span class="badge badge-fail">${t('status.fail')}</span>`;
+    time.textContent = '—';
     tr.title = `${entry.path}\n${r.detail}`;
   }
 }
@@ -351,6 +365,7 @@ function rerenderAll() {
 
 function addEntries(entries) {
   let added = 0;
+  const now = Date.now();
   for (const e of entries) {
     if (state.entries.has(e.path)) continue;
     state.entries.set(e.path, {
@@ -359,13 +374,15 @@ function addEntries(entries) {
       dir: dirName(e.path),
       size: e.size || 0,
       result: null,
+      // 新添加的图片排在队列最上面（按 addedAt 降序）
+      addedAt: now,
     });
     added += 1;
   }
   if (added > 0) {
-    // 按文件名排序，保持列表稳定
-    const sorted = [...state.entries.values()].sort((a, b) =>
-      a.name.localeCompare(b.name, 'zh-Hans-CN')
+    // 新添加的图片置顶：按 addedAt 降序（同批内保持稳定插入顺序）
+    const sorted = [...state.entries.values()].sort(
+      (a, b) => (b.addedAt || 0) - (a.addedAt || 0)
     );
     state.entries = new Map(sorted.map((e) => [e.path, e]));
     renderList();
@@ -390,7 +407,17 @@ async function runCompress() {
   state.busy = true;
   updateButtons();
 
-  const paths = [...state.entries.keys()];
+  // 仅处理未完成的图片：done 状态保持不变，不重复压缩
+  const pending = [...state.entries.values()].filter(
+    (e) => !e.result || e.result.status !== 'done'
+  );
+  if (pending.length === 0) {
+    state.busy = false;
+    updateButtons();
+    showToast(t('toast.allDone'));
+    return;
+  }
+  const paths = pending.map((e) => e.path);
   const channel = makeChannel(internals, applyResult);
 
   try {

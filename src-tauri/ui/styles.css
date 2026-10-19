@@ -484,8 +484,9 @@ html, body {
 .col-name { min-width: 220px; }
 .col-size, .col-ratio { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .col-status { width: 96px; }
+.col-time { width: 96px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); }
 .col-actions { width: 84px; white-space: nowrap; text-align: right; }
-th.col-size, th.col-ratio, th.col-actions { text-align: right; }
+th.col-size, th.col-ratio, th.col-time, th.col-actions { text-align: right; }
 
 .file-name { font-weight: 600; display: block; max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-dir { font-size: 11.5px; color: var(--muted); display: block; max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }

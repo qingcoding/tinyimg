@@ -537,6 +537,7 @@ dependencies = [
  "anyhow",
  "clap",
  "color_quant",
+ "flate2",
  "indicatif",
  "jpeg-encoder",
  "png",
