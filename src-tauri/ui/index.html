@@ -162,18 +162,17 @@
             <p class="field-hint" data-i18n="field.levelHint">拖动控制细腻程度：越靠右画质越好、体积略大；越靠左压缩越狠、体积更小</p>
           </div>
         </div>
+
+        <!-- 操作：主行动按钮（原底栏按钮移至侧栏底部） -->
+        <div class="panel actions-panel">
+          <button class="btn btn-primary btn-run" id="btnRun" type="button" disabled>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>
+            <span data-i18n="btn.run">开始压缩</span>
+          </button>
+          <button class="btn btn-ghost btn-clear" id="btnClear" type="button" disabled data-i18n="btn.clear">清空列表</button>
+        </div>
       </aside>
     </main>
-
-    <!-- 底栏：信息在左，操作按钮靠右 -->
-    <footer class="bottombar">
-      <span class="bottom-info" id="bottomInfo">共 0 个文件</span>
-      <button class="btn btn-primary btn-run" id="btnRun" type="button" disabled>
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>
-        开始压缩
-      </button>
-      <button class="btn btn-ghost" id="btnClear" type="button" disabled data-i18n="btn.clear">清空列表</button>
-    </footer>
   </div>
 
   <div class="toast" id="toast" hidden></div>

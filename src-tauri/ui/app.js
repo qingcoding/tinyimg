@@ -71,7 +71,6 @@ const statSaved = $('statSaved');
 const statRatio = $('statRatio');
 const statDone = $('statDone');
 const progressBar = $('progressBar');
-const bottomInfo = $('bottomInfo');
 const toast = $('toast');
 
 const rowEls = new Map();
@@ -152,7 +151,6 @@ function renderStats() {
   statRatio.classList.toggle('good', doneOriginal > 0);
   statDone.textContent = `${done.length} / ${entries.length}`;
   progressBar.style.width = entries.length ? `${(done.length / entries.length) * 100}%` : '0%';
-  bottomInfo.textContent = t('list.count', { n: entries.length });
 }
 
 function updateButtons() {

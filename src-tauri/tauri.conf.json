@@ -11,7 +11,7 @@
       {
         "title": "TinyImg",
         "width": 1120,
-        "height": 840,
+        "height": 900,
         "minWidth": 900,
         "minHeight": 600,
         "dragDropEnabled": true,

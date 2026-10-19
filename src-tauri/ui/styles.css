@@ -292,7 +292,7 @@ html, body {
 .app {
   height: 100vh;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 12px;
   padding: 14px 20px;
 }
@@ -448,8 +448,11 @@ html, body {
 }
 .btn-ghost:hover:not(:disabled) { background: var(--hover); border-color: var(--accent-glow); }
 .btn-small { font-size: 12.5px; padding: 6px 12px; }
-.btn-run { padding: 11px 26px; font-size: 14.5px; border-radius: 12px; }
+/* 侧栏底部操作按钮：全宽堆叠（开始压缩 / 清空列表） */
+.btn-run { width: 100%; justify-content: center; padding: 10px 0; font-size: 14.5px; border-radius: 12px; }
 .btn-run svg { width: 17px; height: 17px; }
+.btn-clear { width: 100%; justify-content: center; padding: 8px 0; }
+.actions-panel { display: flex; flex-direction: column; gap: 8px; padding: 12px 18px; }
 
 /* ---------- 文件列表 ---------- */
 .list-panel { display: flex; flex-direction: column; min-height: 0; flex: 1; }
@@ -527,11 +530,12 @@ th.col-size, th.col-ratio, th.col-actions { text-align: right; }
 .empty-rows { text-align: center; color: var(--muted); font-size: 13px; padding: 36px 0; }
 
 /* ---------- 右侧：统计 ---------- */
+/* 操作面板移入侧栏后微收余量（约 6px），配合默认窗高 900 保证侧栏零滚动 */
 .stats-panel { padding-bottom: 10px; }
-.stat-hero { padding: 2px 18px 6px; }
+.stat-hero { padding: 2px 18px 5px; }
 .stat-label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 3px; }
 .stat-big {
-  font-size: 27px;
+  font-size: 24px;
   font-weight: 800;
   letter-spacing: -0.5px;
   font-variant-numeric: tabular-nums;
@@ -540,7 +544,7 @@ th.col-size, th.col-ratio, th.col-actions { text-align: right; }
   background-clip: text;
   color: transparent;
 }
-.stat-row { display: flex; gap: 10px; padding: 0 18px 6px; }
+.stat-row { display: flex; gap: 10px; padding: 0 18px 5px; }
 .stat-item {
   flex: 1;
   background: var(--stat-item-bg);
@@ -551,7 +555,7 @@ th.col-size, th.col-ratio, th.col-actions { text-align: right; }
 .stat-value { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .stat-value.good { color: var(--good); }
 .progress-track {
-  margin: 0 18px 2px;
+  margin: 0 18px 1px;
   height: 8px;
   border-radius: 999px;
   background: var(--track-bg);
@@ -737,19 +741,11 @@ th.col-size, th.col-ratio, th.col-actions { text-align: right; }
 }
 .dir-path.set { color: var(--accent-deep); font-weight: 600; }
 
-/* ---------- 底栏 ---------- */
-.bottombar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.bottom-info { margin-right: auto; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
-
 /* ---------- Toast ---------- */
 .toast {
   position: fixed;
   left: 50%;
-  bottom: 88px;
+  bottom: 24px;
   transform: translateX(-50%);
   background: var(--toast-bg);
   color: var(--toast-text);
