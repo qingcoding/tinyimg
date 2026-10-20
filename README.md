@@ -238,3 +238,7 @@ WebP 有损/无损分流、输出命名策略（含 .webp 扩展名）、无收�
 | 扁平图 WebP 自动无损 | 有损 WebP 糊硬边（logo PSNR 仅 19.7dB），无损反而更小（122 B）且零损失 |
 | GUI 输出目录与输入同目录时强制 `-min` 后缀 | 绝不覆盖原文件（PRD Q1 安全默认）；专用输出目录才允许覆盖同名旧产物 |
 | 偏好存 app_config_dir JSON（原子写） | 比 localStorage 更稳（清缓存不丢），临时文件 + rename 防半写损坏 |
+
+## 许可证
+
+[MIT](LICENSE) © 2026 secondyang
