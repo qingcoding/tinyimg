@@ -79,8 +79,9 @@ GUI 与 CLI 共用同一压缩库（`tinyimg` crate），算法行为完全一�
 - **多语言**：10 种语言（简体中文 / 繁體中文 / English / 日本語 / 한국어 / Français / Deutsch /
   Español / Русский / Português），首次启动自动跟随系统语言，默认回落中文，可手动切换并记忆
 - **主题配色**：6 套一键切换（碧海 / 暗夜 / 紫罗兰 / 苍穹 / 蔷薇 / 森林），CSS 变量驱动，即时生效
-- 队列列表（原体积 / 压缩后 / 压缩率 / 状态）+ 统计面板（已节省、平均压缩率、进度）
+- 队列列表（原体积 / 压缩后 / 压缩率 / 状态 / **处理时间**）+ 统计面板（已节省、平均压缩率、进度）；新导入图片自动置顶，已处理项自动跳过，全部完成弹出 Toast
 - 批量并行压缩，逐文件流式进度
+- **压缩程度滑条**（顶栏）：默认 = high 档（256 色 / 有损 q88，与原行为零差异）；拖到最左（=0）启用**极致档**，PNG 走 Zopfli 穷举压缩（IDAT 极限压缩，体积再省 3-8%，速度更慢）
 
 > 前端为原生 HTML/CSS/JS（`src-tauri/ui/`，无构建链），IPC 直连 Tauri internals；
 > 质量档位、前后对比等 PRD 其余需求见「路线图」。
@@ -111,11 +112,11 @@ TinyPNG 的核心不是"再压一次 Deflate"，而是**改变数据的表示方
 | ① 量化 Quantization | 24-bit 真彩（1670 万色）→ 8-bit 索引色（≤256 色调色板），丢弃人眼不敏感的颜色信息 | `NeuQuant` 神经网络量化（`color_quant`）+ 调色板去重 |
 | ② 透明槽位 | 全透明像素单独占 1 个调色板名额，经 tRNS 表达 | 同左（`pngw::write_indexed_png`） |
 | ③ 误差扩散 | 精细控制的 dithering | 可选 Floyd–Steinberg（`--dither`） |
-| ④ 无损增强 | zopfli（DEFLATE 穷举优化，比 zlib 小 3-8%） | `zopfli` crate，IDAT 极限压缩 |
+| ④ 无损增强 | zopfli（DEFLATE 穷举优化，比 zlib 小 3-8%） | 普通档：`flate2` 快速 zlib（远快于 zopfli）；极致档（GUI 滑条=0）：`zopfli` 穷举，IDAT 极限压缩 |
 | ⑤ 元数据剥离 | 去除 EXIF / ICC / 文本块 | 重新写出，只保留最小必要 chunk |
 | ⑥ 智能回退 | 质量下降明显时自动调整 | 体积守卫：无收益则保留原文件；半透明 >5% 回退真彩 |
 
-**PNG 路线**：解码归一化为 8-bit RGBA → 量化 ≤256 色索引 PNG → zopfli 压缩 IDAT。
+**PNG 路线**：解码归一化为 8-bit RGBA → 量化 ≤256 色索引 PNG → zopfli/flate2 压缩 IDAT（极致档走 zopfli）。
 **JPEG 路线**：解码 → 按目标质量重编码（量化表重生成）→ 只写 JFIF 标准段（元数据天然剥离）。
 **WebP 路线**（`--format webp`）：解码后直接 libwebp 编码——照片走有损（VP8 预测编码，
 同画质比 JPEG 小 25-35%），扁平少色图（≤256 色，如 logo/图标/像素画）自动走无损，守住硬边。
@@ -124,7 +125,7 @@ TinyPNG 的核心不是"再压一次 Deflate"，而是**改变数据的表示方
 半透明像素按 `(r>>3, g>>3, b>>3, alpha)` 粗桶直方图取 Top-N 生成半透明专用调色板槽
 （pngquant 同族思路，抗锯齿边缘同色系聚为一桶，桶内平均 RGB/alpha），半透明像素与
 不透明像素共同参与 Floyd–Steinberg 误差扩散；**>5%** 时量化 alpha 是质量事故高发区，
-保守回退为 RGBA 真彩 + zopfli。
+保守回退为 RGBA 真彩 + zopfli/flate2。
 
 ## 参数说明
 
@@ -157,7 +158,7 @@ tinyimg-pc/
 │   ├── lib.rs            # 库入口（压缩核心可复用）
 │   ├── cli.rs            # clap 参数定义
 │   ├── quant.rs          # NeuQuant 量化 + 去重 + FS 误差扩散
-│   ├── pngw.rs           # 极简 PNG 写出器（CRC32 + zopfli）
+│   ├── pngw.rs           # 极简 PNG 写出器（CRC32 + zopfli/flate2，极致档走 zopfli）
 │   ├── util.rs           # 体积格式化 / 压缩率 / 终端色彩
 │   ├── compress/
 │   │   ├── mod.rs        # 格式识别、输出策略、扁平图检测、单文件处理
@@ -181,18 +182,26 @@ tinyimg-pc/
 ├── examples/
 │   ├── gen_samples.rs    # 生成测试样本
 │   └── verify_quality.rs # 像素级画质校验（MAE / PSNR，支持 PNG/JPEG/WebP）
-└── tests/
-    ├── integration.rs    # CLI/库端到端测试（21 项）
-    └── qa_semi_edge.rs   # 半透明边缘 QA 测试（19 项）
+├── tests/
+│   ├── integration.rs    # CLI/库端到端测试（21 项）
+│   └── qa_semi_edge.rs   # 半透明边缘 QA 测试（19 项）
+└── docs/
+    ├── PRD.md            # 产品需求
+    └── DESIGN.md         # 压缩管线设计与算法取舍
 ```
+
+## 项目文档
+
+- [`docs/PRD.md`](docs/PRD.md) — 产品需求（GUI 交互、输出策略、安全默认、路线图来源）
+- [`docs/DESIGN.md`](docs/DESIGN.md) — 压缩管线设计与算法取舍细节
 
 ## 测试
 
 ```bash
-cargo test                                  # 库 + CLI：59 项（lib 19 + integration 21 + qa_semi_edge 19）
-cd src-tauri && cargo test --release        # GUI 逻辑：15 项（偏好 / 输出策略 / 压缩管线 / 目录收集）
-cd src-tauri && node tests/ui_logic.test.mjs  # 前端逻辑：15 项（Channel 乱序重排 / 事件监听 / 纯函数 / i18n 与主题）
-cargo build --release --no-default-features # 精简构建（无 WebP，~1.0 MB）
+cargo test                                     # 库 + CLI：69 项（lib 29 + integration 21 + qa_semi_edge 19）
+cd src-tauri && cargo test --release           # GUI 逻辑：18 项（偏好 / 输出策略 / 压缩管线 / 目录收集）
+cd src-tauri && node tests/ui_logic.test.mjs   # 前端逻辑：16 项（Channel 乱序重排 / 事件监听 / 纯函数 / i18n 与主题）
+cargo build --release --no-default-features    # 精简构建（无 WebP，~1.0 MB）
 ```
 
 覆盖：CRC32 标准向量、量化色数预算、透明槽位、半透明量化扩展（≤5% 索引 + tRNS
@@ -208,6 +217,8 @@ WebP 有损/无损分流、输出命名策略（含 .webp 扩展名）、无收�
 - [x] **macOS 打包**：`tauri build` 产出 `TinyImg.app`（5.0 MB）+ 压缩 DMG（2.2 MB，含卷图标与 Applications 拖拽安装软链），ad-hoc 签名本机可直接打开
 - [x] **多语言**：10 种语言，首次启动跟随系统语言（默认回落中文），手动选择记忆
 - [x] **主题配色**：6 套（碧海 / 暗夜 / 紫罗兰 / 苍穹 / 蔷薇 / 森林）CSS 变量驱动即时切换
+- [x] **极致档 + 压缩程度滑条**：GUI 滑条默认 high 档（与旧版零差异），拖到最左（=0）启用 Zopfli 极致压缩；普通档走 flate2 快速 zlib，批量提速明显
+- [x] **队列体验增强**：新图置顶、处理时间列、已处理自动跳过、全部完成 Toast
 - [ ] M3 GUI 体验完整：质量档位预设、保留元数据开关、前后对比、Toast 通知（见 `docs/PRD.md`）
 - [ ] M2 画质守卫：SSIM 低于阈值自动提高色数重试（PRD 的"智能回退"完全体）
 - [ ] M4 WebP/AVIF 输入支持
@@ -217,7 +228,7 @@ WebP 有损/无损分流、输出命名策略（含 .webp 扩展名）、无收�
 | 决策 | 理由 |
 |---|---|
 | Rust + 手工 PNG 写出而非 image crate | 二进制 1.0 MB；image crate 全特性会引入数 MB |
-| zopfli 而非 miniz_oxide | TinyPNG 同款压缩器，索引数据上再省 3-8% |
+| 普通档 flate2 快速 zlib + 极致档 zopfli | 极致档复用 TinyPNG 同款压缩器，索引数据再省 3-8%；普通档用 flate2（miniz_oxide 后端）远快于 zopfli，批量提速明显（GPU 无法加速串行 DEFLATE） |
 | NeuQuant 而非 Median Cut | 神经网络量化对照片类渐变更稳，纯 Rust 无 C 依赖 |
 | 半透明 ≤5% 量化扩展 / >5% 真彩回退 | 抠图抗锯齿边缘色系统计聚桶后可无损承受；大面积半透明量化 alpha 是质量事故高发区 |
 | 体积守卫（无收益跳过） | 已优化图片二次压缩可能反而变大 |
