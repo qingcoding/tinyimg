@@ -23,12 +23,15 @@ jobs:
         include:
           - os: macos-latest
             target: aarch64-apple-darwin
+            config: tauri.conf.json
             label: macOS (Apple Silicon)
           - os: macos-13
             target: x86_64-apple-darwin
+            config: tauri.conf.json
             label: macOS (Intel)
           - os: windows-latest
             target: x86_64-pc-windows-msvc
+            config: tauri.windows.conf.json
             label: Windows (x64)
 
     steps:
@@ -64,7 +67,7 @@ jobs:
 
       - name: Build bundle
         working-directory: src-tauri
-        run: tauri build --target ${{ matrix.target }}
+        run: tauri build --target ${{ matrix.target }} --config ${{ matrix.config }}
 
       - name: Collect artifacts
         shell: bash
