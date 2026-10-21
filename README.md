@@ -69,6 +69,23 @@ npx @tauri-apps/cli@2 build    # 产物：target/release/bundle/macos/TinyImg.ap
 > 并确保 PATH 中是系统真实 `grep`（bundle_dmg.sh 用 `grep -E` 解析 `hdiutil` 输出，
 > toybox 版 grep 会误报 `bad regex`）。
 
+## 下载
+
+预编译安装包通过 **GitHub Releases** 提供，无需自行构建（由 GitHub Actions 在每次打 `v*` 标签时自动构建并发布）：
+
+| 平台 | 文件 | 说明 |
+|---|---|---|
+| macOS（Apple Silicon，M 系列） | `TinyImg_0.1.0_aarch64.dmg` | 打开后把 `TinyImg.app` 拖入 Applications |
+| macOS（Intel） | `TinyImg_0.1.0_x64.dmg` | 打开后把 `TinyImg.app` 拖入 Applications |
+| Windows（64 位） | `TinyImg_0.1.0_x64-setup.exe` | NSIS 安装器，双击按向导安装 |
+
+下载页：[v0.1.0 Release](https://github.com/qingcoding/tinyimg/releases/tag/v0.1.0)
+
+> 安装包为**未签名 / ad-hoc 签名**：
+> - macOS 首次打开若被 Gatekeeper 拦截，请右键 → 打开；或执行
+>   `xattr -dr com.apple.quarantine /Applications/TinyImg.app`。
+> - Windows SmartScreen 可能提示"未知发布者"，选择"仍要运行"即可。
+
 GUI 与 CLI 共用同一压缩库（`tinyimg` crate），算法行为完全一致。当前已交付：
 
 - **输入**：选择单个文件 / 选择整个文件夹（原生对话框，文件夹递归扫描），或直接拖入窗口
@@ -214,7 +231,7 @@ WebP 有损/无损分流、输出命名策略（含 .webp 扩展名）、无收�
 - [x] **M1 CLI 核心**：PNG 量化 + JPEG 重编码 + zopfli + 元数据剥离
 - [x] **WebP 输出**：`--format webp`，照片有损 / 扁平图无损自动分流
 - [x] **M3 GUI 桌面壳（首批）**：Tauri 2 窗口 + 单文件/文件夹/拖拽导入 + 输出类型（默认跟随输入）+ 输出目录 + 记忆上次位置 + 队列与统计
-- [x] **macOS 打包**：`tauri build` 产出 `TinyImg.app`（5.0 MB）+ 压缩 DMG（2.2 MB，含卷图标与 Applications 拖拽安装软链），ad-hoc 签名本机可直接打开
+- [x] **跨平台打包（CI 自动发布）**：GitHub Actions 在打 `v*` 标签时自动构建 macOS（Apple Silicon / Intel 双 dmg）+ Windows（NSIS 安装器）并发布到 GitHub Release，无需本地构建
 - [x] **多语言**：10 种语言，首次启动跟随系统语言（默认回落中文），手动选择记忆
 - [x] **主题配色**：6 套（碧海 / 暗夜 / 紫罗兰 / 苍穹 / 蔷薇 / 森林）CSS 变量驱动即时切换
 - [x] **极致档 + 压缩程度滑条**：GUI 滑条默认 high 档（与旧版零差异），拖到最左（=0）启用 Zopfli 极致压缩；普通档走 flate2 快速 zlib，批量提速明显
