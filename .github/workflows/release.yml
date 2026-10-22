@@ -25,7 +25,8 @@ jobs:
             target: aarch64-apple-darwin
             config: tauri.conf.json
             label: macOS (Apple Silicon)
-          - os: macos-13
+          # GitHub 已下线 macos-13（Intel 镜像）；改为在 ARM runner 上交叉编译 x86_64
+          - os: macos-latest
             target: x86_64-apple-darwin
             config: tauri.conf.json
             label: macOS (Intel)
